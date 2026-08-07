@@ -1,121 +1,370 @@
-# Monad Dev Resources — extracted from Blitz Resources page
+# Monad Blitz London — Dev Resources Cheat Sheet
 
-Source: [Monad Blitz Resources (Notion)](https://monad-foundation.notion.site/Blitz-resources-3036367594f2802a92c6f2d063f832ef)
+One-stop reference for building at **Monad Blitz London** (8 Aug 2026).  
+Sources: [Blitz London Notion](https://monad-foundation.notion.site/Monad-Blitz-London-cde6367594f282c4b69a0183ad05b9d9), [Blitz Resources Notion](https://monad-foundation.notion.site/Blitz-resources-3036367594f2802a92c6f2d063f832ef), official docs at [`docs.monad.xyz`](https://docs.monad.xyz/), and this repo’s `docs/event_details/`.
 
-Compiled by fanning out from the Blitz resources page into Monad's official docs (`docs.monad.xyz`) and cross-checking with web search where the docs page itself couldn't be fetched directly. Every item below is marked **confirmed** (verified on an official page) or **reported** (consistent third-party sources, not independently verified on a Monad Foundation-controlled page) — treat "reported" items as needing a live sanity-check at the event, not as hard fact.
-
----
-
-## ⚠️ Most important finding: no hackathon-specific RPC found
-
-**No dedicated/premium RPC offer, partnership, or allowance for Monad Blitz specifically was found anywhere** — not on the Blitz resources page, not in linked docs, not via web search. This directly bears on [open_questions.md](idea/open_questions.md) Question 1 (RPC access) and Question 2 (per-tick vs. batched settlement) — it does **not** resolve those questions, but it removes "maybe there's an event RPC we don't know about yet" as a reason to delay deciding. Plan should assume **public RPC only, unless confirmed otherwise by Monad staff at the venue.**
-
-Also **no Discord/Telegram/mentor-support channel link** was found on the resources page or anywhere linked from it — worth asking about at check-in, since it's a real gap in what's documented.
+Last refreshed: 2026-08-07.
 
 ---
 
-## Network basics
+## 1. Event quick facts
 
-| Item | Value | Status |
-|---|---|---|
-| Testnet chain ID | `10143` | confirmed |
-| Testnet RPC URL | `https://testnet-rpc.monad.xyz` | reported (couldn't load the official docs Testnet tab directly to re-confirm the exact string) |
-| Testnet faucet hub | `https://testnet.monad.xyz/` | confirmed to exist |
-| Testnet faucet (direct) | `https://faucet.monad.xyz` | confirmed to exist, was returning HTTP 429 during research (i.e. real and actively rate-limited) |
-| Faucet claim amount | ~10 MON (wallet holds ≥0.001 ETH on mainnet) or 0.5 MON (new/unverified wallet); 1 claim per address / 24h | reported, not on an official page |
-| Block explorer | `https://testnet.monadexplorer.com` | reported |
-| Docs home | `https://docs.monad.xyz/` | confirmed |
-| Developer portal | `https://developers.monad.xyz/` | confirmed |
+| Item | Detail |
+|---|---|
+| Event | Monad Blitz London |
+| Date | **Saturday 8 August 2026** |
+| Time | 9:00 AM – 9:00 PM |
+| Venue (reported) | Encode Hub, 41 Pitfield St, London N1 6DA |
+| Format | 1-day sprint; innovate freely; no tracks |
+| Official page | https://monad-foundation.notion.site/Monad-Blitz-London-cde6367594f282c4b69a0183ad05b9d9 |
+| Blitz resources | https://monad-foundation.notion.site/Blitz-resources-3036367594f2802a92c6f2d063f832ef |
+| Submission / voting portal | Blitz / Devnads portal (open from event page — see `docs/event_details/submission_process.md`) |
+| Team size | **Max 4** |
+| Must deploy on | **Monad Testnet** |
+| Must be public | Public GitHub repo |
 
-**Backup faucets** if the official one is congested during the event: Alchemy, QuickNode, Chainstack, Morkie, Faucet.Trade faucets — smaller drips (0.05–1 MON / 12–24h) but useful as a fallback.
+### Schedule
 
-## RPC providers (from `docs.monad.xyz/tooling-and-infra/rpc-providers`)
+| Time | Activity |
+|---|---|
+| 9:00 – 10:00 | Registration & breakfast |
+| 10:00 – 10:15 | Opening & briefing |
+| 10:15 – 11:30 | Monad101 & Monskills workshop |
+| 11:30 – 18:00 | Hacking |
+| 18:00 | Code freeze |
+| 18:30 | Submission deadline |
+| 18:30 – 20:30 | Pitches (3 min each) |
+| 20:30 – 21:00 | Prizes |
 
-Both mainnet and testnet supported by: Alchemy, Ankr, Blockdaemon, BlockPI, Chainstack, dRPC, NodeCloud, Dwellir, Envio (free read-only), GetBlock, OnFinality, QuickNode, Spectrum, Tatum, thirdweb (RPC Edge), Validation Cloud (50M free compute units, no credit card).
+### Prizes
 
-No testnet-specific rate limits are published. (Mainnet limits are published, e.g. QuickNode 25 rps, Alchemy 15 rps — listed here only as a rough proxy for what "generous" vs "tight" free tiers look like, not as testnet truth.)
+| Place | Amount |
+|---|---|
+| 1st | $1,200 USD |
+| 2nd | $800 USD |
+| 3rd & 4th | $500 USD each |
 
-**Recommendation:** default to `https://testnet-rpc.monad.xyz`; register a free-tier key with Alchemy or QuickNode as a fallback *before* the event so it's ready if the public endpoint gets congested during a 10–50-concurrent-session demo.
+### Rules (critical)
 
-## Monad vs. Ethereum — confirmed gotchas (`docs.monad.xyz/developer-essentials/differences`)
+- **Fresh ideas only** — no pre-built projects / continuing old personal apps. Planning & research before the day is encouraged; coding starts at the Blitz.
+- **Innovate, don’t clone** — clones without a Monad-specific twist are discouraged.
+- **Public + testnet** — public GitHub + live Monad Testnet deployment required.
+- Details: [`docs/event_details/rules.md`](event_details/rules.md)
 
-Relevant to contract and simulator design for this project:
+### Judging = community vote (on-screen demos)
 
-- **Gas is charged on declared gas *limit*, not actual usage** — a DoS-mitigation quirk. Setting an overly generous gas limit on the per-tick `ingestTick` calls costs real MON even if unused. Tune gas limits tightly once the contract is stable, especially since we're sending many small transactions per second.
-- **`eth_maxPriorityFeePerGas` is hardcoded to 2 gwei; `eth_feeHistory` returns hardcoded/default values on testnet.** Do not build dynamic fee-estimation logic into the simulator — it won't reflect real network conditions on testnet anyway. Just use a fixed/simple fee strategy.
-- **No global mempool** — transactions are forwarded locally to upcoming leaders only. Worth knowing if the simulator sees odd propagation behavior under load.
-- **"Reserve balance" mechanism** — a transaction can be included and pay gas, then still revert. Don't assume inclusion = success; check receipts.
-- Max contract code size 128 KB (vs 24 KB on Ethereum) — irrelevant at our scale, just headroom.
-- Memory pricing is linear (not quadratic), capped at 8 MB/tx — favorable for any per-tick contract logic.
-- secp256r1 precompile supported (on-chain WebAuthn/passkey verification) — not needed for the hackathon scope, but relevant if a future version wants passkey-based car/station identity instead of raw private keys.
-- Full nodes don't retain arbitrary historic state — if the dashboard ever needs to query historical session data rather than live events, plan for an indexer (see below), not raw `eth_getLogs` over old ranges.
+- Peers vote on a platform during presentations + **15 minutes after the last demo**.
+- Teams **cannot vote for themselves**.
+- Criteria to optimize for:
+  1. **Novelty & originality**
+  2. **Innovative mechanics** (esp. leveraging Monad)
+  3. **Problem-solving** for interesting consumer challenges
+  4. **Learning & experimentation** (polish is secondary)
+  5. Spirit: what **excited** voters most
+- Full text: [`docs/event_details/judging_criteria.md`](event_details/judging_criteria.md)
 
-(Commonly-cited "~1s block time / ~10,000 TPS" figures are third-party, not verified directly against an official Monad page in this pass — usable in the pitch as "commonly cited," not as a sourced official claim.)
+### Demo tips (3 minutes)
 
-## Toolkits (`docs.monad.xyz/tooling-and-infra/toolkits`)
+- Live testnet demo is the core — get to it fast.
+- Slides optional; peers are fellow developers.
+- Backup: screenshots + short recorded video if RPC dies.
+- Details: [`docs/event_details/project_demo.md`](event_details/project_demo.md)
 
-- **Monad Foundry** — Monad's own fork of Foundry (`forge`/`cast`/`anvil`/`chisel`) with native Monad EVM + staking-precompile support and human-readable trace decoding. **This is Monad's recommended path for Solidity dev** — use this over vanilla Foundry.
-- **Hardhat** — also supported, JS-based.
-- **Monad Solonet** — run a local Monad network for dev/testing before touching testnet at all; worth using early to avoid burning faucet MON and RPC calls on debugging.
+### Submission checklist
 
-viem/ethers/wagmi/thirdweb SDK are **not named** on the toolkits page, but Monad is EVM-equivalent so they should work over standard RPC — no Monad-specific guidance was found for them.
+1. Fork the Blitz starter / `monad-blitz-london` style repo (or use this team repo).
+2. Put code + README in your **public** fork.
+3. Deploy contracts to **Monad Testnet**; verify if time allows.
+4. Submit on the Blitz portal: GitHub URL (+ Demo URL, or GitHub again if no separate demo host).
+5. You can edit submission until voting starts.
+- Details: [`docs/event_details/submission_process.md`](event_details/submission_process.md)
 
-## Deployment (Foundry path, from `docs.monad.xyz/guides/deploy-smart-contract/foundry`)
+### What to bring
 
-```bash
-# 1. Get testnet funds first: https://testnet.monad.xyz/
+Laptop + charger, mouse/headphones, IDE + Foundry/Node/Git, adapters, water bottle, idea notes.  
+Venue: Wi-Fi, power, food, mentors.  
+Details: [`docs/event_details/what_to_bring.md`](event_details/what_to_bring.md)
 
-# 2. Recommended: keystore, not raw private key
-cast wallet import monad-deployer --interactive
-forge create --rpc-url <testnet-rpc-url> --account monad-deployer --sender <address>
+---
 
-# Discouraged (docs explicitly call this less safe) but faster to script:
-forge create --rpc-url <testnet-rpc-url> --private-key <key>
+## 2. Monad performance pitch numbers (official docs)
+
+From [`docs.monad.xyz`](https://docs.monad.xyz/):
+
+- **~10,000 TPS** design throughput
+- **300ms** block frequency
+- **600ms** finality
+- Full **EVM bytecode** + Ethereum-compatible **JSON-RPC**
+- Parallel execution, async execution, MonadBFT, MonadDb
+
+Use these in the pitch; show them visually (e.g. live TPS / City GDP) rather than only citing slides.
+
+---
+
+## 3. Monad Testnet — primary network for Blitz
+
+Official: https://docs.monad.xyz/developer-essentials/testnets
+
+> Testnet was **reset from genesis on 2025-12-16**. Don’t rely on very old testnet state or addresses from before that.
+
+| Item | Value |
+|---|---|
+| Network name | `Monad Testnet` |
+| Chain ID | `10143` (`0x279F`) |
+| Currency | `MON` (18 decimals) |
+| Public RPC | `https://testnet-rpc.monad.xyz` |
+| Public WS | `wss://testnet-rpc.monad.xyz` |
+| Explorer (MonadVision) | https://testnet.monadvision.com |
+| Explorer (Monadscan) | https://testnet.monadscan.com |
+| Network viz | https://www.gmonads.com/?network=testnet |
+| App hub | https://testnet.monad.xyz/ |
+| Faucet | https://faucet.monad.xyz |
+| Add to wallet guide | https://docs.monad.xyz/guides/add-monad-to-wallet/testnet |
+| Current version (docs) | `v0.15.2` / `MONAD_NINE` |
+
+### Wallet add (manual)
+
+```
+Network Name: Monad Testnet
+RPC URL:      https://testnet-rpc.monad.xyz
+Chain ID:     10143
+Currency:     MON
+Explorer:     https://testnet.monadvision.com
 ```
 
-Docs' own words: *"Using a keystore is much safer than using a private key because keystore encrypts the private key."* Verification is documented separately for [Foundry](https://docs.monad.xyz/guides/verify-smart-contract/foundry) and [Hardhat](https://docs.monad.xyz/guides/verify-smart-contract/hardhat) — exact commands weren't extractable in this pass, open those pages directly when it's time to deploy.
+Faucet “add network” page also lists explorer `https://testnet.monadexplorer.com/` — prefer **MonadVision** from official docs when linking in README/demo.
 
-## No starter kits / boilerplates found
+### Testnet public RPCs + limits (official)
 
-The Blitz resources page has no scaffolding repo, template, or boilerplate links. The only GitHub link surfaced anywhere in this research was `github.com/monad-crypto/protocols` — a list of canonical deployed contract addresses, not a starter kit. **Plan to scaffold from scratch** (or from Monad Foundry's own project init, if it has one — check `forge init` behavior under the Monad Foundry fork).
+| RPC | Provider | Limits | Notes |
+|---|---|---|---|
+| `https://testnet-rpc.monad.xyz` / `wss://…` | QuickNode | **50 rps** (25 rps for `eth_call` / `eth_estimateGas`); batch 100 | Archive ✅ |
+| `https://rpc.ankr.com/monad_testnet` | Ankr | 300 / 10s ; 12k / 10 min; batch 100 | No archive; no `debug_*` |
+| `https://rpc-testnet.monadinfra.com` / `wss://…` | Monad Foundation | **20 rps**; batch not allowed | Archive ✅ |
 
-## Other docs worth knowing about (not core to this project, but linked from the same resources page)
+More detail: https://docs.monad.xyz/reference/rpc-limits
 
-- [Using Indexers](https://docs.monad.xyz/guides/indexers/) — relevant if the dashboard ever needs to query historical settlement events beyond what's cheap to pull live (ties to the "no historic state on full nodes" gotcha above).
-- [x402 on Monad](https://docs.monad.xyz/guides/x402-guide), [ERC-8004 on Monad](https://docs.monad.xyz/guides/erc-8004-guide) — payments/agent-identity related guides, worth a skim in case either is directly reusable for the car/station identity or metering-attestation piece.
-- [Kuru Flow](https://docs.monad.xyz/guides/kuru-flow) (swaps), [Blinks](https://docs.monad.xyz/guides/blinks-guide) — not relevant to this project's scope.
+**Blitz note:** No hackathon-specific premium RPC was found on Blitz resources. Assume public endpoints. Pre-register Alchemy / QuickNode / Ankr free tiers as backup before the event. Cap concurrent agent spam if you hit 429s.
 
-## Full link index (all confirmed, linked directly from the Blitz resources page)
+### Faucet
+
+- Primary: https://faucet.monad.xyz
+- Hub: https://testnet.monad.xyz/
+- Expect rate limits / 429 under load — claim early; keep backup wallets funded for agent bots.
+
+### Testnet canonical contracts (selected)
+
+| Name | Address |
+|---|---|
+| Wrapped MON | `0xFb8bf4c1CC7a94c73D209a149eA2AbEa852BC541` |
+| Multicall3 | `0xcA11bde05977b3631167028862bE2a173976CA11` |
+| Permit2 | `0x000000000022d473030f116ddee9f6b43ac78ba3` |
+| CreateX | `0xba5Ed099633D3B313e4D5F7bdc1305d3c28ba5Ed` |
+| Foundry Deterministic Deployer | `0x4e59b44847b379578588920ca78fbf26c0b4956c` |
+| EntryPoint v0.7 | `0x0000000071727De22E5E9d8BAf0edAc6f37da032` |
+| EntryPoint v0.8 | `0x4337084d9e255fF0702461CF8895cE9E3b5Ff108` |
+| x402 ExactPermit2Proxy | `0x402085c248EeA27D92E8b30b2C58ed07f9E20001` |
+| x402 UptoPermit2Proxy | `0x4020A4f3b7b90ccA423B9fabCc0CE57C6C240002` |
+
+Full list + Safe contracts: https://docs.monad.xyz/developer-essentials/testnets  
+Testnet tokens: https://github.com/monad-crypto/token-list/blob/main/tokenlist-testnet.json
+
+---
+
+## 4. Monad Mainnet (reference — not required for Blitz)
+
+Official: https://docs.monad.xyz/developer-essentials/network-information
+
+| Item | Value |
+|---|---|
+| Network name | `Monad Mainnet` |
+| Chain ID | `143` (`0x8F`) |
+| Currency | `MON` |
+| Public RPC examples | `https://rpc.monad.xyz`, `https://rpc1.monad.xyz`, `https://rpc2.monad.xyz`, `https://rpc3.monad.xyz`, `https://rpc-mainnet.monadinfra.com` |
+| Explorer | https://monadvision.com · https://monadscan.com |
+| App hub | https://app.monad.xyz |
+| Network viz | https://gmonads.com |
+| Multicall3 | `0xcA11bde05977b3631167028862bE2a173976CA11` (same as testnet) |
+
+Mainnet launched **24 Nov 2025** (docs). Blitz submissions must be on **testnet**.
+
+---
+
+## 5. Deploy fast (Monad Foundry — recommended)
+
+Docs: https://docs.monad.xyz/guides/deploy-smart-contract/foundry
+
+```bash
+# Install Monad Foundry (WSL required on Windows)
+curl -L https://foundry.category.xyz | bash
+foundryup --network monad
+
+# Scaffold (official template)
+forge init --template monad-developers/foundry-monad [project_name]
+
+# foundry.toml essentials
+# eth-rpc-url = "https://testnet-rpc.monad.xyz"
+# chain_id = 10143
+
+forge compile
+
+# Fund wallet via https://testnet.monad.xyz/ or https://faucet.monad.xyz
+
+# Prefer keystore over raw private key
+cast wallet import monad-deployer --interactive
+cast wallet address --account monad-deployer
+forge create src/Counter.sol:Counter --account monad-deployer --broadcast
+```
+
+Also supported: [Hardhat](https://docs.monad.xyz/guides/deploy-smart-contract/hardhat), [Remix](https://docs.monad.xyz/guides/deploy-smart-contract/remix).  
+Verify: [Foundry verify](https://docs.monad.xyz/guides/verify-smart-contract/foundry) · [Hardhat verify](https://docs.monad.xyz/guides/verify-smart-contract/hardhat).
+
+**Local:** [Monad Solonet](https://docs.monad.xyz/tooling-and-infra/toolkits/monad-solonet) — full local Monad in Docker for debugging before burning faucet/RPC.
+
+**Frontend templates:** Scaffold-ETH, Reown AppKit, Next/Privy templates — see https://docs.monad.xyz/guides/ and https://docs.monad.xyz/templates/
+
+---
+
+## 6. Monad vs Ethereum — gotchas that break demos
+
+Official: https://docs.monad.xyz/developer-essentials/differences
+
+Use **Monad Foundry** so local behavior matches chain.
+
+| Topic | What it means for Blitz |
+|---|---|
+| **Gas charged on `gas_limit`, not usage** | Over-estimating gas on every agent tx burns MON. Set tight limits once measured. |
+| **Reserve balance** | Tx can be included, pay gas, still **revert**. Always check receipts — don’t assume inclusion = success. |
+| **No global mempool** | Tx forwarded to upcoming leaders only; odd timing under load is possible. |
+| **No EIP-4844 blob txs** | Don’t use type-3 blob transactions. |
+| **Historical state limited** | Don’t build dashboards on deep historic `eth_call` / old logs via full nodes — use events + indexer. |
+| **Max contract size 128 KB** | More headroom than ETH 24 KB. |
+| **Memory pricing linear, max 8 MB/tx** | Fine for most hackathon contracts. |
+| **secp256r1 / P256 precompile** | Passkeys/WebAuthn possible; optional stretch. |
+| **EIP-7702** | Delegated EOAs can’t dip below **10 MON**; `CREATE`/`CREATE2` banned when called as contract. |
+
+Gas pricing deeper dive: https://docs.monad.xyz/developer-essentials/gas-pricing
+
+---
+
+## 7. High-performance app practices (for agent / city demos)
+
+Official: https://docs.monad.xyz/developer-essentials/best-practices
+
+Especially relevant to SimCityL1-style spam:
+
+1. **Hardcode gas** when usage is static — skip `eth_estimateGas` per tick.
+2. **Batch / parallelize reads** — `Promise.all` RPC batches; Multicall3 at `0xcA11…CA11` (serial inside contract — don’t stuff huge expensive batches).
+3. **Use an indexer** for event-heavy UIs instead of polling `eth_getLogs` forever — see https://docs.monad.xyz/guides/indexers/ (Envio, QuickNode Streams, GhostGraph, etc.).
+4. Prefer websockets where available for live feeds.
+
+---
+
+## 8. Tooling & infra index
 
 | Topic | URL |
 |---|---|
-| Network information | https://docs.monad.xyz/developer-essentials/network-information |
-| Add Monad to Wallet | https://docs.monad.xyz/guides/add-monad-to-wallet/ |
-| Deploy a smart contract (index) | https://docs.monad.xyz/guides/deploy-smart-contract/ |
-| — via Foundry | https://docs.monad.xyz/guides/deploy-smart-contract/foundry |
-| — via Hardhat | https://docs.monad.xyz/guides/deploy-smart-contract/hardhat |
-| — via Remix | https://docs.monad.xyz/guides/deploy-smart-contract/remix |
-| Verify a smart contract (index) | https://docs.monad.xyz/guides/verify-smart-contract/ |
-| — via Foundry | https://docs.monad.xyz/guides/verify-smart-contract/foundry |
-| — via Hardhat | https://docs.monad.xyz/guides/verify-smart-contract/hardhat |
-| Tokens & Bridges | https://docs.monad.xyz/developer-essentials/network-information/tokens-and-bridges |
-| Differences between Monad and Ethereum | https://docs.monad.xyz/developer-essentials/differences |
-| Tooling and Infrastructure (index) | https://docs.monad.xyz/tooling-and-infra/ |
-| RPC Providers | https://docs.monad.xyz/tooling-and-infra/rpc-providers |
+| Docs home | https://docs.monad.xyz/ |
+| Docs LLM index | https://docs.monad.xyz/llms.txt |
+| Developer portal | https://developers.monad.xyz/ |
+| Network info (mainnet) | https://docs.monad.xyz/developer-essentials/network-information |
+| Network info (testnet) | https://docs.monad.xyz/developer-essentials/testnets |
+| Deployment summary | https://docs.monad.xyz/developer-essentials/summary |
+| RPC providers | https://docs.monad.xyz/tooling-and-infra/rpc-providers |
 | Toolkits | https://docs.monad.xyz/tooling-and-infra/toolkits |
-| Using Indexers | https://docs.monad.xyz/guides/indexers/ |
-| x402 on Monad | https://docs.monad.xyz/guides/x402-guide |
-| ERC-8004 on Monad | https://docs.monad.xyz/guides/erc-8004-guide |
+| Indexers | https://docs.monad.xyz/guides/indexers/ |
+| Block explorers | https://docs.monad.xyz/tooling-and-infra/block-explorers |
+| Architecture | https://docs.monad.xyz/monad-arch/ |
+| JSON-RPC reference | https://docs.monad.xyz/reference/json-rpc/overview |
+| Tokens & bridges | https://docs.monad.xyz/developer-essentials/network-information/tokens-and-bridges |
+| Protocols / addresses | https://github.com/monad-crypto/protocols |
+| Token lists | https://github.com/monad-crypto/token-list |
+| Foundry-Monad template | https://github.com/monad-developers/foundry-monad |
+| monad-developers org | https://github.com/monad-developers |
+
+### Guides often linked from Blitz resources
+
+| Guide | URL |
+|---|---|
+| x402 on Monad | https://docs.monad.xyz/guides/x402 |
+| ERC-8004 (trustless agents) | https://docs.monad.xyz/guides/erc-8004 |
 | Kuru Flow (swaps) | https://docs.monad.xyz/guides/kuru-flow |
-| Blinks | https://docs.monad.xyz/guides/blinks-guide |
-| Monad Architecture | https://docs.monad.xyz/monad-arch/ |
+| Scaffold-ETH | https://docs.monad.xyz/guides/scaffold-eth |
+| Reown AppKit wallet connect | https://docs.monad.xyz/guides/reown |
+| MCP server for Monad Testnet | https://docs.monad.xyz/guides/monad-mcp |
 
 ---
 
-## What's still unconfirmed / worth asking at the venue
+## 9. Official community / support
 
-1. Whether Monad Foundation is offering any dedicated/higher-limit RPC for Blitz participants (nothing found — worth just asking staff directly rather than assuming).
-2. Discord/Telegram/mentor-support channel for the event (not found on this page — check the event registration/Luma page instead).
-3. Exact testnet RPC rate limits (only mainnet limits are published).
-4. Exact faucet claim amount/cooldown (only third-party-reported figures found).
-5. Exact `forge`/`hardhat` contract-verification command syntax on Monad (pages exist, weren't extractable in this pass — open directly when needed).
+From https://docs.monad.xyz/official-links
+
+| Channel | Link |
+|---|---|
+| Developer Discord | https://discord.gg/monaddev |
+| Community Discord | https://discord.gg/monad |
+| Dev announcements Telegram | https://t.me/monad_devs |
+| Announcement Telegram | https://t.me/monad_xyz |
+| Research forum | https://forum.monad.xyz |
+| DevNads on X | https://x.com/monad_dev |
+| Monad on X | https://x.com/monad |
+| Website | https://monad.xyz |
+| Blog | https://blog.monad.xyz |
+| DeltaV founders | https://deltav.monad.xyz/ |
+
+Ask at venue check-in for any **Blitz-specific** mentor Discord / staff channel (not always listed on Notion).
+
+---
+
+## 10. Ideas in this repo
+
+| Folder | Idea |
+|---|---|
+| [`docs/idea/`](idea/) | Amber Current — per-second EV / V2G streaming payments |
+| [`docs/idea_simCity/`](idea_simCity/) | SimCityL1 — civic agent city; GDP = TPS (**current win-oriented pick**) |
+| [`docs/idea_athena/`](idea_athena/) | Athena-lite — forum claims → replication bounties |
+
+---
+
+## 11. Day-of checklist (print / pin)
+
+- [ ] Wallet on Monad Testnet (`10143`)
+- [ ] Faucet MON claimed (deployer + agent wallets)
+- [ ] Backup RPC key ready (Ankr / Alchemy / QuickNode)
+- [ ] Monad Foundry installed (`foundryup --network monad`)
+- [ ] Contracts deploy + verified (or at least explorer link)
+- [ ] Frontend live demo URL (Vercel/etc.) or local + ngrok
+- [ ] Public GitHub README with one-liner + how Monad is required
+- [ ] 3-minute demo rehearsed: open alive → one wow beat → Monad line
+- [ ] Screenshots + 30s backup video
+- [ ] Portal submission before **18:30**
+
+---
+
+## 12. Still ask staff if unclear
+
+1. Any Blitz-only RPC / faucet allowance
+2. Exact Devnads / voting portal URL once unlocked
+3. Mentor Discord for the London room
+4. Whether contract verification is expected vs optional for votes
+
+---
+
+## Link dump (Blitz Notion → docs)
+
+| Topic | URL |
+|---|---|
+| Blitz London hub | https://monad-foundation.notion.site/Monad-Blitz-London-cde6367594f282c4b69a0183ad05b9d9 |
+| Blitz resources | https://monad-foundation.notion.site/Blitz-resources-3036367594f2802a92c6f2d063f832ef |
+| Network information | https://docs.monad.xyz/developer-essentials/network-information |
+| Testnets | https://docs.monad.xyz/developer-essentials/testnets |
+| Add Monad to wallet | https://docs.monad.xyz/guides/add-monad-to-wallet/ |
+| Deploy (Foundry / Hardhat / Remix) | https://docs.monad.xyz/guides/deploy-smart-contract/ |
+| Verify | https://docs.monad.xyz/guides/verify-smart-contract/ |
+| Differences vs Ethereum | https://docs.monad.xyz/developer-essentials/differences |
+| Best practices | https://docs.monad.xyz/developer-essentials/best-practices |
+| RPC providers | https://docs.monad.xyz/tooling-and-infra/rpc-providers |
+| Toolkits | https://docs.monad.xyz/tooling-and-infra/toolkits |
+| Indexers | https://docs.monad.xyz/guides/indexers/ |
+| Architecture | https://docs.monad.xyz/monad-arch/ |
+| Official links | https://docs.monad.xyz/official-links |
