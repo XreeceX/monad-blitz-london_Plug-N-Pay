@@ -59,7 +59,37 @@ The idea document intentionally leaves both open; a later spec should choose (or
    - Session/stream contract: opens on handshake, tracks flow rate and/or per-tick settlements, enforces "no payment obligation without a corresponding signed metering event," closes on session end.
    - Wallet/balance contract or direct native-MON handling for both parties.
    - Optional: a registry contract mapping station/vehicle identities (from the ISO 15118-derived certs) to on-chain wallet addresses, so the handshake step and the payment step are cryptographically linked (you can't spoof "I am this station" to redirect payment).
-6. **Dashboard / live UI** (this is the demo's emotional core, matching the story): shows the "live meter" — a number ticking down (charging) or up (V2G) once per second/tick, mirroring exactly what's happening on-chain. This is what makes the abstract "streaming payment" tangible to a hackathon audience.
+6. **Live settlement dashboard** (this is the demo's emotional core, matching the story — see Section 11 for full detail): not a consumer app, but an observability surface onto the settlement layer, showing live transactions, running totals, and a map of concurrent sessions across many simulated cars and stations at once.
+
+## 11. Product framing: infrastructure, not a consumer app
+
+This is a **settlement/payment rail**, not a product a driver opens and interacts with directly — closer to a protocol running underneath an app (a charging network's own app, a car manufacturer's dashboard, a utility's V2G program) than an app in its own right. The car and station talk to each other and to the chain machine-to-machine; a human driver's only touchpoint is whatever their EV's dashboard or charging network's existing app chooses to surface (e.g. the live-ticking-number moment in the story is what a *downstream* app would build on top of this rail, not something this project ships itself).
+
+This matters for scoping: there is no login flow, no driver-facing app screen, no onboarding UX to design or build. What this project *does* ship is the settlement layer itself (contracts + simulated M2M clients) plus one purpose-built **observability dashboard** (Section 11a below) whose job is to make an inherently invisible, machine-to-machine process visible for a demo audience — it is explicitly an operator/demo view, not the end-user product surface.
+
+## 11a. Live settlement dashboard (the demo surface)
+
+Since there's no consumer app to demo, the dashboard *is* the demo. It should read like a live ops/monitoring console for the settlement network — "watching value move like electricity" — not like a wallet or billing app. Concretely:
+
+- **Live scrolling settlement feed**: a real-time log of individual settlement events as they land on-chain, e.g.:
+  - `Car 0x8a2… → Station #4 · 0.0021 MON · charging`
+  - `Station #7 → Car 0xC91… · 0.0089 MON · V2G sell`
+  New entries append/scroll continuously as ticks settle across *all* concurrent sessions, not just one.
+- **Running counters** (top of dashboard, updating live since demo/session start): total transactions settled, total MON moved (gross, and/or split by direction).
+- **Visual grid/map of simulated stations and cars**: each node pulses or flashes the instant it participates in a settlement, so the audience can *see* activity distributed across the network, not just read numbers.
+- **Live charge-vs-V2G split**: a running ratio/bar showing buy-side (charging) volume vs. sell-side (V2G) volume happening concurrently, reinforcing the bidirectional/symmetric story visually.
+
+## 11b. Demo at concurrent scale, not a single session
+
+The demo should not be "one car, one station, watch a number move" — it should spin up **many simulated sessions concurrently** (e.g. 10–50 car↔station sessions running at once, a mix of charging and V2G-discharging) so the dashboard shows real throughput: a busy, continuously-updating feed and map, not an isolated transaction. This is also the strongest, most direct visual proof of the "only possible at Monad's speed/cost" claim — a slower or more expensive chain couldn't sustain this many concurrent per-second settlements live on stage. This point should directly inform Section 9's hackathon scope decisions (the simulator layer needs to support spinning up N concurrent simulated car/station pairs, not just one hardcoded pair).
+
+## 11c. Naming: Amber Current
+
+**Decision: Amber Current.** Chosen over Voltstream (existing unrelated companies already use the name — real collision risk) and Open Circuit (more evocative, but a generic electrical-engineering term, weaker trademark defensibility) — Amber Current had no meaningful collisions found and keeps the option open to carry the name past the hackathon if this becomes a real project.
+
+## 11d. Demo opening: dashboard-led, no physical prop
+
+The demo opens on the dashboard itself, not a physical charging-cable prop — consistent with the infrastructure/no-consumer-app framing in Section 11: a plug-in moment would re-center the pitch on a single session right before pivoting to concurrent scale, which undercuts the "this is a settlement rail, not a product" positioning. The opening beat is hitting "Spin Up Network" and watching the dashboard go from idle to live across many concurrent sessions at once.
 
 ## 6. End-to-end flow (charging / forward direction)
 
