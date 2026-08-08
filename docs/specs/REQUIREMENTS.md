@@ -423,7 +423,7 @@ Priority split (corrected — see traceability note below): FR-BOOTH-1/2/4 are *
 |---|---|---|---|
 | FR-BOOTH-1 | A participant MUST reach a playable state from QR scan with no install, no login, and no wallet. | S | D |
 | FR-BOOTH-2 | The app MUST NOT block on the network at any point, and MUST NOT display a network error to a participant. | S | D |
-| FR-BOOTH-3 | The app MUST report energy deltas to the relay through the M5 interface. | S | T |
+| FR-BOOTH-3 | The app MUST report tap events to the **game server (M10)**, not to the settlement relay. **Superseded 2026-08-08 by §16: the booth app makes no chain calls at all.** | M | T |
 | FR-BOOTH-4 | The app MUST remain fully playable with the relay unreachable. | S | D |
 | FR-BOOTH-5 | The app MUST NOT collect credentials, private keys, or payment details. | M | I |
 | FR-BOOTH-6 | Any participant reward MUST be decided by skill, never by a randomly assigned attribute. | M | I |
@@ -435,8 +435,8 @@ Priority split (corrected — see traceability note below): FR-BOOTH-1/2/4 are *
 | FR-BOOTH-12 | Final standings MUST be reviewed before publication and revealed after the event, not at the venue. | M | I |
 | FR-BOOTH-13 | The engine MUST cap the effective tap rate at **30/s** — above any human rate, since five fingers reaches about 25/s. The cap MUST NOT sit inside the human range: at 20/s a four-finger player and a script both score 5,732, which reintroduces a tie at the prize-winning positions that soft saturation exists to prevent. An earlier score ceiling of 4,200 was also useless, sitting above the curve's own asymptote of 4,040. | M | T |
 | FR-BOOTH-14 | The app MUST accept up to 5 concurrent pointers and MUST state in its instructions that multiple fingers are allowed. Three fingers reaches 12–15 taps/s; silently discarding a third finger would penalise the best players with nothing on screen explaining why. | M | D |
-| FR-BOOTH-15 | Each booth session MUST settle on an **8-second** interval, phase-staggered per player (`offset = index × 8/N`). 60 players at 8 s is 7.5 tx/s against a measured single-wallet write ceiling of 10 (§13.4), leaving 25% headroom; at 6 s it was exactly 10 with none. Unstaggered, the same load arrives as a 60-transaction spike. Return to 6 s only if a wallet-pool run raises the measured ceiling. | M | T |
-| FR-BOOTH-16 | Session opens MUST complete during the join window, before the round starts, and the final settlement MUST also serve as the close. Otherwise 60 opens and 60 closes add roughly 3 tx/s of bursts on top of steady settlement. | M | T |
+| FR-BOOTH-15 | ~~Settlement interval per booth session.~~ **Withdrawn 2026-08-08.** Booth sessions no longer settle on-chain at all (§16), so there is no interval to tune and no per-player chain load. The measurement that drove it stands in §13.4 and now governs M4/M5 only. | — | — |
+| FR-BOOTH-16 | ~~Session-open scheduling.~~ **Withdrawn 2026-08-08** with FR-BOOTH-15, for the same reason. | — | — |
 
 ### M9 — Demo control & observability
 
@@ -519,7 +519,7 @@ Defined in `2026-08-08-booth-frontend-design.md` §8. System-level obligations:
 | ID | Requirement | Target | Ver |
 |---|---|---|---|
 | NFR-P-1 | Settlement cadence per session | **1 Hz for simulated sessions (M6) — this is the product claim.** Booth sessions (M8) settle at 6 s, because 60 of them at 1 Hz would need 60 tx/s. The two never run at full load together: UC-10 ramps simulated sessions down as phones connect, so the budget carries either ~10 simulated at 1 Hz or 60 phones at 6 s, not both | D |
-| NFR-P-2 | Concurrent sessions sustained during the demo | **60 live**, the whole room, at an 8-second settlement interval = 7.5 tx/s against a measured write ceiling of 10 (§13.4). Reached by lowering cadence rather than capping players; at 1 Hz the same 60 sessions need 60 tx/s and are impossible | D |
+| NFR-P-2 | Concurrent sessions sustained during the demo | **~10 on-chain simulated sessions at 1 Hz**, comfortably inside the measured 10 tx/s write ceiling (§13.4). Booth players are **unbounded** and contribute zero chain load (§16); the game server, not the chain, is their only limit | D |
 | NFR-P-3 | Settlement visible on the wall after landing | ≤ 1 s | D |
 | NFR-P-4 | Dashboard frame rate at target concurrency | Readable, no visible stutter | D |
 | NFR-P-5 | Booth app frame rate on mid-range Android | 60 fps | T |
@@ -760,3 +760,64 @@ Named so nobody builds them by accident, and so a reviewer can see the boundary 
 ## 15. Glossary
 
 See §1.4. Additional terms used in requirements: **tick** (one metering interval and its settlement effect), **the wall** (the projector dashboard, module M7), **degraded mode** (any reduced-cadence or larger-batch operation entered under RPC pressure, which must always be labelled).
+
+
+---
+
+## 16. The demo/backend split (decided 2026-08-08)
+
+**The booth app makes no chain calls.** Not one. No wallets, no RPC, no transaction submission, no gas, no confirmations. It runs the settlement engine in memory against a game server, and everything a player sees is computed locally to the same rules the on-chain contract uses.
+
+### 16.1 Why
+
+The write measurement in §13.4 put the single-wallet ceiling at 10 tx/s. Sixty phones settling individually needed exactly that, with no margin, on public infrastructure the team does not control and cannot provision. Every attempt to fit the crowd inside that budget — capping players, widening the interval, pooling wallets — traded away either audience size or safety, and the pool remained unproven for want of a funded wallet.
+
+Moving the crowd off-chain removes the constraint rather than negotiating with it. The real settlement demo needs only about ten concurrent sessions, which sits comfortably inside the measured ceiling, and it runs from a wallet the team funds and controls.
+
+### 16.2 The seam
+
+| | Booth app (M8) + game server (M10) | Real rail (M1–M7) |
+|---|---|---|
+| Settlement | In memory, same accounting rules | On-chain, Monad testnet |
+| Wallets | None | Funded, team-controlled |
+| Chain calls | **Zero** | Per-tick, 1 Hz |
+| Players | Unbounded | ~10 simulated sessions |
+| Label | `SIMULATION — same engine, nothing on-chain` | `LIVE — Monad testnet` + contract address |
+
+The engine SHOULD be the literal same accounting module both sides use, so "same engine, simulated" is true by construction rather than by assertion.
+
+### 16.3 Requirements
+
+| ID | Requirement | Pri | Ver |
+|---|---|---|---|
+| FR-SPLIT-1 | The booth app MUST make zero chain calls and hold no key material. | M | I |
+| FR-SPLIT-2 | The booth app MUST NOT display anything that looks verifiable but is not — no transaction hashes, block numbers, addresses, or explorer-styled links. A developer will paste one into the explorer within seconds of seeing it. Simulated MON and kWh figures are fine because nobody can mistake them for a receipt. | M | I |
+| FR-SPLIT-3 | Scoring MUST be server-authoritative: the game server computes the score from tap events and the client renders only. With cash on a public leaderboard and a room full of developers, a client-reported score is an open endpoint. | M | T |
+| FR-SPLIT-4 | The game server MUST rate-cap taps per connection at the engine cap (30/s, FR-BOOTH-13). | M | T |
+| FR-SPLIT-5 | Both surfaces MUST carry their label permanently and visibly: the phone reads `SIMULATION — same engine, nothing on-chain`, the dashboard reads `LIVE — Monad testnet` with the contract address. The symmetry is what makes the honesty structural rather than a disclaimer. | M | D |
+| FR-SPLIT-6 | Player count MUST be unbounded by the chain. Any limit is the game server's and MUST be stated if one exists. | M | D |
+
+### 16.4 The bridge: one aggregate settlement
+
+At the close of the pitch, the room's combined simulated energy settles as **a single real transaction** on Monad testnet, from the team's funded wallet, and the presenter shows the hash on the explorer.
+
+| ID | Requirement | Pri | Ver |
+|---|---|---|---|
+| FR-SPLIT-7 | The game server MUST expose the room aggregate (total kWh, total MON) for a single `settleRoomAggregate` submission. | M | D |
+| FR-SPLIT-8 | The aggregate transaction MUST be pre-signed with automatic retry, and a rehearsal aggregate MUST be minted ten minutes before the pitch. If the live send stalls beyond five seconds, show the rehearsal hash and **say plainly what it is**. | M | D |
+
+One transaction against a measured 10 tx/s ceiling is tenfold margin, confirms inside a second, and is genuinely explorer-verifiable. Netting off-chain metering into one on-chain settlement is an established pattern rather than a dodge.
+
+**Rejected alternatives.** An offline queue settling after the pitch is invisible at the moment people vote, and "it'll settle later" is the sound of an overclaim. A pre-recorded replay is discounted to zero by a developer audience and contaminates trust in the live dashboard beside it.
+
+### 16.5 The honesty line
+
+Said by the presenter **before anyone asks**, because volunteering the limitation converts it into evidence of rigour:
+
+> "We load-tested Monad's public RPC this afternoon — it holds ten transactions a second from one wallet, and sixty phones settling individually is exactly ten a second with zero margin. So we made an engineering call: your phone runs our settlement engine in pure simulation, zero chain calls, and the projector is the real rail, live on Monad testnet right now. Here's the explorer. Check any session."
+
+A peer vote punishes perceived overclaiming far harder than it punishes modest scope.
+
+### 16.6 Residual risk
+
+The risk has moved, not vanished. It is now **venue wifi**. Host the game server in the cloud so phones can fall back to cellular; run the dashboard locally with a hotspot.
