@@ -48,8 +48,10 @@ export function Wall() {
   useEffect(() => {
     let dead = false
 
+    const roomQ = new URLSearchParams(window.location.search).get('room')
+
     async function pollWall() {
-      const res = await getWall()
+      const res = await getWall(roomQ)
       if (dead) return
       if (res) {
         setWall(res)
@@ -57,7 +59,7 @@ export function Wall() {
       }
     }
     async function pollLb() {
-      const res = await getLeaderboard(10)
+      const res = await getLeaderboard(10, roomQ)
       if (dead) return
       if (res) {
         setEntries(res.entries)

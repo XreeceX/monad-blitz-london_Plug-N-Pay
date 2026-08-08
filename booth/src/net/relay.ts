@@ -144,14 +144,23 @@ export async function endSession(payload: {
   whDischarged: number
   score: number
   tapCount: number
+  roomId?: string
+  deviceId?: string
+  nickname?: string
+  carName?: string
 }): Promise<EndResult | null> {
   if (payload.sessionId.startsWith('local-')) return null
   return post<EndResult>('/session/end', payload)
 }
 
-export async function getLeaderboard(n = 10): Promise<{ entries: LeaderboardEntry[]; updatedAt: number } | null> {
+export async function getLeaderboard(
+  n = 10,
+  roomId?: string | null,
+): Promise<{ entries: LeaderboardEntry[]; updatedAt: number } | null> {
   try {
-    const res = await fetch(`${BASE}/leaderboard?n=${n}`)
+    const q = new URLSearchParams({ n: String(n) })
+    if (roomId) q.set('room', roomId)
+    const res = await fetch(`${BASE}/leaderboard?${q}`)
     if (!res.ok) return null
     serverReachable = true
     return await res.json()
@@ -169,9 +178,10 @@ export interface WallData {
   surgeAt?: number | null
 }
 
-export async function getWall(): Promise<WallData | null> {
+export async function getWall(roomId?: string | null): Promise<WallData | null> {
   try {
-    const res = await fetch(`${BASE}/wall`)
+    const q = roomId ? `?room=${encodeURIComponent(roomId)}` : ''
+    const res = await fetch(`${BASE}/wall${q}`)
     if (!res.ok) return null
     serverReachable = true
     return await res.json()

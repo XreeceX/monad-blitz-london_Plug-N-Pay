@@ -12,15 +12,16 @@ says so on screen, permanently (FR-SPLIT-5).
 
 ```bash
 npm install
-npm run dev        # phone app on your LAN (host is enabled for phone testing)
+npm run dev        # Vite (:5173) + room server (:3001), proxied together
 ```
 
-- Phone app: `http://<your-ip>:5173/`
-- Public wall / host screen: `http://<your-ip>:5173/#wall`
-  - Seal the standings (FR-BOOTH-11): press `S` twice within 3 seconds.
+- Frontpage: `http://<your-ip>:5173/` — **HOST THIS ROUND**, join by code, or play solo
+- Host lobby: big-screen QR + player list + **START ROUND**
+- Players scanning the QR land in a waiting lobby and enter the game together when you start
+- Public wall: `http://<your-ip>:5173/?room=ABCD#wall` (also opened from the host screen)
+  - Seal the standings (FR-BOOTH-11): press `S` twice within 3 seconds
 
-Works fully offline — with no game server the app plays identically and the
-leaderboard falls back to this device only, labelled as such (degradation L2).
+Solo play still works with the server down. Hosted rooms need the room server.
 
 ## For the backend (game server, M10)
 
@@ -52,17 +53,14 @@ strictly increasing with tap rate; 30/s hard cap). Current worst deviation: 1.2%
 
 ## Deploy (Render)
 
-`render.yaml` at the repo root deploys this as a Render **Static Site**:
+`render.yaml` deploys **one Node Web Service** that serves the SPA and the
+room-sync API (`server.mjs`):
 
 1. Render dashboard → **New → Blueprint** → select this repo → Apply.
-2. That's it — it builds `booth/` and publishes `dist/`, auto-deploying on
-   every push to `main`.
-3. Once the game server exists, uncomment `VITE_API_BASE` in `render.yaml`
-   (its Render URL + `/api`) and set `VITE_PUBLIC_URL` to the booth site's
-   own URL so the wall's QR encodes the public address. Redeploy.
+2. Wait for the build. Open the service URL — that is the live demo.
+3. Optional: set `VITE_PUBLIC_URL` to that URL in the Render env and rebuild
+   so host QR codes always encode the canonical address.
 
-Until the server is live the deployed app runs in its designed offline mode:
-fully playable, leaderboard local to each device and labelled as such.
-
-Manual alternative: `npm run build` → static files in `dist/`; any static
-host works.
+If you already have a Static Site from an earlier blueprint, delete it and
+re-apply the blueprint (or create a new Web Service with root `booth`,
+build `npm ci && npm run build`, start `npm start`).

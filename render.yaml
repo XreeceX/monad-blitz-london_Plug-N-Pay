@@ -1,25 +1,20 @@
-# Render blueprint — deploys the booth frontend as a static site.
-# Dashboard → New → Blueprint → pick this repo. Auto-deploys on push to main.
-#
-# The game server (M10, backend) is a separate service; when it exists, set
-# VITE_API_BASE to its URL here (or in the dashboard) and redeploy.
+# Render blueprint — one Web Service serves the SPA and the room-sync API.
+# Dashboard → New → Blueprint → pick this repo → Apply.
+# Auto-deploys on push to main.
 
 services:
   - type: web
     name: plug-n-pay-booth
-    runtime: static
+    runtime: node
     rootDir: booth
     buildCommand: npm ci && npm run build
-    staticPublishPath: dist
+    startCommand: npm start
     autoDeployTrigger: commit
+    healthCheckPath: /api/health
     envVars:
-      # - key: VITE_API_BASE
-      #   value: https://plug-n-pay-server.onrender.com/api
-      # - key: VITE_PUBLIC_URL
-      #   value: https://plug-n-pay-booth.onrender.com/
       - key: NODE_VERSION
         value: '22'
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
+      # Optional once you know the public URL — makes the host QR encode
+      # the canonical address instead of whatever host opened the page.
+      # - key: VITE_PUBLIC_URL
+      #   value: https://plug-n-pay-booth.onrender.com
