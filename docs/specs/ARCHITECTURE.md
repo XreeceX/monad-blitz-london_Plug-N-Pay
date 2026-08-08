@@ -2006,7 +2006,7 @@ honest account of what "ready for people to use" does and does not mean here.
 
 | Process | Runs on | Why there | Public? |
 |---|---|---|---|
-| **`relay`** (M1–M6, M9) | A **long-lived container host** — Railway, Render, Fly.io, or a plain VPS | **Must not have a function-duration cap.** FD-3/ADR-5 puts SSE on this hop, and a serverless platform that kills connections at 300 s would break FR-DASH-8 mid-pitch. This is the one hosting constraint the architecture actually imposes | Yes — the wall and game server reach it |
+| **`relay`** (M1–M6, M9) | **Render** — decided 2026-08-08 | **Must not have a function-duration cap.** FD-3/ADR-5 puts SSE on this hop, and a serverless platform that kills connections at 300 s would break FR-DASH-8 mid-pitch. That property is the whole basis of the choice. Render is **already chosen for the game server**, so using it for both removes a moving part rather than adding one. Railway, Fly.io or a plain VPS satisfy the same constraint if Render fails | Yes — the wall and game server reach it |
 | **`wall`** (M7) | Static build; **served from the relay host**, or run from `file://` on the presenting laptop | Same-origin with the relay removes CORS and one failure mode. Running it locally is the more robust choice on venue wifi and is the recommended default | No — projector only |
 | **`ops`** (M9 surface) | Same origin as the wall | Shared-secret header; physical laptop control is the security model (TB-4) | No |
 | **`booth-app`** (M8) | **Vercel**, per its own spec | Static React build; the 300 s cap is irrelevant because ADR-5 already puts this hop on polling | **Yes — QR code** |
@@ -2150,10 +2150,10 @@ Ordered. Each row is checkable by someone other than the person who built it.
 
 | # | Check | Gate | Requirement |
 |---|---|---|---|
-| **1** | 🔴 **Re-run the write measurement with ≥3 funded wallets** — `PRIVATE_KEY=k1,k2,k3 node tools/measure-write-rpc.mjs --send`. Record the ceiling. **This is the number the whole design rests on and it has been measured once, provisionally, from a shared public key** | **T-4h, first** | §16.7, FR-REL-8 |
+| **1** | 🔴 **Probe `eth_sendRawTransactionSync`** against `testnet-rpc.monad.xyz`. Two minutes, one curl. **ADR-3 assumes it exists and it has never been called** — the write runs used async `eth_sendRawTransaction`. This is now the top unknown, the RPC-ceiling one having been retracted | **T-4h, first** | §16.9 |
 | 2 | Faucet's real per-address amount and interval established (replaces the UNVERIFIED note) | T-4h | ASM-1 |
-| 3 | **2–3 wallets** funded **above the 10 MON reserve floor** — every wallet reads ≥12 MON, **~36 MON total** (§16.8, not the superseded 150) | T-3h | FR-REL-8, §16.8 |
-| 3b | **Probe `eth_sendRawTransactionSync`** against `testnet-rpc.monad.xyz` — two minutes, and ADR-3's whole budget depends on it | T-4h | §16.9 |
+| 3 | **One wallet** funded **above the 10 MON reserve floor** — reads ≥12 MON. One faucet claim; no pool, no consolidation (§16.10) | T-3h | §5.3, §16.10 |
+| 3b | *Optional, only with spare time:* multi-wallet throughput comparison from the **venue network** with **own** funded keys. Settles FR-REL-8 either way. **Not a gate** — a single wallet has run 60 tx/s clean | — | §16.10 |
 | 4 | Funding transfers **≥3 blocks old**; readiness proven by a **successful test transaction**, never a balance read | T-2h30 | §5.5.1 |
 | 5 | Identity pool of 60 registered and confirmed | T-2h30 | FR-SIM-6 |
 | 6 | Contracts deployed **and verified** — checked from a logged-out browser | T-2h | NFR-M-2, AC-9 |
