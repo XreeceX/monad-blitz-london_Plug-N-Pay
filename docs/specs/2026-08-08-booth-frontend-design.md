@@ -623,7 +623,11 @@ One keypress hits `POST /api/surge` with a timestamp about two seconds in the fu
 
 **Wall:** one horizontal amber conduit spans the projector with a marked breaker threshold, `DC FAST · 1.0 MW`. Per-player nodes flare as taps arrive. When the room total crosses the threshold, the breaker slams: full-screen flash, conduit goes white-hot, the room-total counter rolls up and freezes.
 
-> **Presenter, over the freeze:** "That number is sixty payment streams settling per second on Monad. That's machine-speed money. That's Plug-N-Pay."
+> **Presenter, over the freeze:** "That's the whole room's energy, settled as one transaction on Monad. Behind it, ten sessions have been settling every second since I started talking. Here's the hash."
+
+**Corrected 2026-08-08 — the previous line was false.** It read *"sixty payment streams settling per second on Monad"*, which overstated the 6-second cadence by six times even before §16, and under §16 the crowd contributes **zero** on-chain settlements. Said to sixty developers who have just been told their phone is a simulation, it is precisely the overclaim FR-SPLIT-2 exists to prevent, and the one sentence most likely to lose the room.
+
+What is actually true, and is still a strong close: roughly ten simulated sessions settling per second on the rail throughout the pitch, plus one real `settleRoomAggregate` transaction carrying the room's combined energy, with a hash anyone can check. Claim those two things and nothing else.
 
 Then each phone shows that player's personal slice of the total.
 
