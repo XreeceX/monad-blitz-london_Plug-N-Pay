@@ -260,6 +260,25 @@ Especially relevant to SimCityL1-style spam:
 
 ---
 
+## 7b. MONSKILLS (team agents)
+
+Install once per machine from repo root:
+
+```bash
+npx skills add therealharpaljadeja/monskills
+```
+
+Then tell your agent to use local MONSKILLS and start with the `monskill` routing skill.
+
+| Resource | URL |
+|---|---|
+| Full team guide | [`docs/MONSKILLS.md`](MONSKILLS.md) |
+| Install instructions | https://skills.devnads.com/install.md |
+| Prompt library | https://skills.devnads.com/prompts |
+| Skill package | https://github.com/therealharpaljadeja/monskills |
+
+`skills-lock.json` at the repo root pins skill versions — commit it; do not commit `.agents/` / `.claude/` / `agent/` skill copies (see `.gitignore`).
+
 ## 8. Tooling & infra index
 
 | Topic | URL |
@@ -329,6 +348,7 @@ Ask at venue check-in for any **Blitz-specific** mentor Discord / staff channel 
 
 ## 11. Day-of checklist (print / pin)
 
+- [ ] `npx skills add therealharpaljadeja/monskills` run (see [`MONSKILLS.md`](MONSKILLS.md))
 - [ ] Wallet on Monad Testnet (`10143`)
 - [ ] Faucet MON claimed (deployer + agent wallets)
 - [ ] Backup RPC key ready (Ankr / Alchemy / QuickNode)

@@ -29,6 +29,16 @@ Verbatim from the organisers. Keep if you are still doing this event; delete oth
 | `BLITZ-LONDON-INTEL.md` | 66 past winners indexed, peer-voting mechanics mapped, category win-rates. The "what has already won and what is saturated" reference |
 | `monad_dev_resources.md` | Monad developer resources, RPC and tooling notes |
 
+### MONSKILLS (agents) — see repo root docs
+
+For Cursor / Claude agents building on Monad, teammates should run:
+
+```bash
+npx skills add therealharpaljadeja/monskills
+```
+
+Full guide + prompt library links live in the project at [`../docs/MONSKILLS.md`](../docs/MONSKILLS.md) (not under PORTABLE — project-attached). Sources: https://skills.devnads.com/install.md · https://skills.devnads.com/prompts
+
 ### `03-method/` — process, fully project-agnostic
 
 | File | Why it matters |
