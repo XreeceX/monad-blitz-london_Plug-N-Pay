@@ -234,15 +234,18 @@ Top-down is the right view: the charge port, the cable route and the fill level 
 All constants in `src/game/constants.ts` so they can be tuned live at the booth.
 
 ```ts
-SESSION_MS         = 30_000
-CAPACITY_KWH       = 1.6      // median player (7 taps/s) flips at t≈24.1s
+SESSION_MS         = 45_000
+CAPACITY_KWH       = 2.2      // typical player (7 taps/s) flips at t≈35.6s
 P_MAX_KW           = 350
-R_REF_TAPS_PER_SEC = 7        // soft-saturation reference, NOT a cap. See below
+R_REF_TAPS_PER_SEC = 7        // soft-saturation reference, NOT a cap
+R_HARD_CAP_PER_SEC = 20       // taps above this yield nothing. See §6
+MAX_POINTERS       = 5        // multi-finger is allowed and expected
 EMA_TAU_MS         = 450
 TAPER_START_SOC    = 0.80
 TAPER_FLOOR        = 0.25     // multiplier at 100% SoC
-SURGE_WINDOWS_MS   = [[8000, 11000], [19000, 22000]]
+SURGE_WINDOWS_MS   = [[10000, 13000], [24000, 27000], [36000, 39000]]
 SURGE_MULTIPLIER   = 2.0
+SETTLE_INTERVAL_MS = 6_000    // per player; phase-staggered. See §8
 PRICE_MON_PER_KWH  = 0.12     // charging, player pays
 V2G_MON_PER_KWH    = 0.30     // sell-back premium, player earns
 ```
@@ -282,17 +285,19 @@ It also behaves better against cheating than the clamp did. Returns diminish sha
 
 **Calibration** (simulated at 120Hz with the taper and both surge windows):
 
-| taps/s | score | Flip at |
-|---|---|---|
-| 4 | 1463 | never |
-| 6 | 1825 | 27.1s |
-| 7 — median | 2128 | 24.1s |
-| 9 | 2582 | 21.3s |
-| 12 | 3071 | 19.8s |
-| 16 | 3500 | 18.3s |
-| 20 | 3732 | 17.3s |
+| taps/s | score | Flip at | technique |
+|---|---|---|---|
+| 4 | 2109 | never | casual, one thumb |
+| 5 | 2365 | 42.6s | casual, one thumb |
+| 7 — typical | 3323 | 35.6s | one thumb |
+| 9 | 4052 | 30.3s | two thumbs |
+| 12 | 4785 | 26.6s | three fingers |
+| 15 | 5269 | 25.5s | three fingers, fast |
+| 20 | 5732 | 24.6s | four fingers — engine cap |
 
-`CAPACITY_KWH` is tuned to 1.6 so a median player reaches the Flip with about six seconds left. At 2.0 kWh a 7-taps/s player peaked at 95% SoC and never saw it — the signature mechanic would have been invisible to most of the room. A player at 4 taps/s still does not reach it, which is deliberate: it has to be worth chasing.
+`CAPACITY_KWH` is tuned to 2.2 for the 45-second round. A typical player flips at 35.6s and earns for the last nine seconds; a casual one at 5 taps/s flips at 42.6s, barely, right at the end, which is the best feeling available. At 4 taps/s the Flip stays out of reach, deliberately — it has to be worth chasing.
+
+The battery was 1.6 kWh while the round was 30 seconds. Extending to 45s without resizing it would have had a typical player flip at 25.7s and spend the remaining 19 seconds in V2G, turning the twist into most of the game.
 
 ---
 
@@ -311,9 +316,9 @@ Real money on a public tap leaderboard. Treat the client as hostile.
 
 | Defence | Rule | Worth it in 2h? |
 |---|---|---|
-| Multi-touch abuse | Ignore beyond 2 concurrent pointers | Yes, 3 lines |
-| Autoclicker | Reject taps `<25ms` apart on the same pointer id | Yes, 2 lines |
-| Runaway tap rate | Soft saturation bounds the gain: 50 taps/s is worth ~1.22× a human's 12 taps/s | Yes, already in the model |
+| Multi-finger play | **Allowed, up to 5 concurrent pointers.** Three fingers reaches 12–15 taps/s and is legitimate skill | Yes — and say so in the instructions |
+| Autoclicker | Cap the effective rate at 20 taps/s rather than rejecting. Above it everyone scores exactly 5,732, so a script gains nothing and no legitimate player is falsely accused | Yes, 1 line |
+| Suspicious rate | Flag any run averaging over 18 taps/s for human review before the Discord reveal. Flagging is free because the reveal is delayed (§3.8) — nobody is accused in the room | Yes, cheap |
 | Direct POST to the relay | Server recomputes score from the tick stream and ignores the client's number | **P1.** Not buildable today alongside everything else |
 | Forged or replayed ticks | Idempotency on `(sessionId, seq)`; reject `seq` ≤ last seen | Yes, cheap |
 | Clock manipulation | Server stamps start and end; client `t` is advisory | Yes, cheap |
@@ -325,7 +330,7 @@ It matters much less here because of the reveal design (§3.8): winners are neve
 
 **The defence, in two parts:**
 
-1. **A plausibility ceiling.** The game was simulated to balance it (§5), so its physical maximum is known: a superhuman 20 taps per second yields about 3,732, and no tap rate reaches beyond roughly 3,950. Any score above **4,200** did not come from playing. Reject or flag it on submission — two lines, not a rebuild.
+1. **A hard rate cap, not a score ceiling.** An earlier draft set a score ceiling of 4,200 and it was worthless: the scoring curve's asymptote was 4,040, so nothing could ever exceed it and the check caught nothing. Soft saturation also compresses cheating — a script at 200 taps/s scored only 18% above an elite human — which is good for fairness but means **score alone cannot detect a cheat**. The engine now caps the effective rate at 20 taps/s (`R_HARD_CAP_PER_SEC`), above any sustained human rate even with four fingers. Everyone above it scores exactly 5,732, so a script gains nothing, and no genuine player is ever falsely accused.
 2. **Review before announcing.** Sort the final list before publishing to Discord. A fabricated entry sits so far outside the real distribution that it is obvious by eye, and there is no clock pressure while doing it.
 
 Server-side recompute (P1) remains the stronger defence and is worth building if the booth app finishes early. It is no longer required to protect the prize.

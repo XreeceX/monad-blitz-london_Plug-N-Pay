@@ -433,7 +433,10 @@ Priority split (corrected — see traceability note below): FR-BOOTH-1/2/4 are *
 | FR-BOOTH-10 | A public leaderboard screen MUST show live standings at the booth, legible across a busy room, updating at least every 5 s. | S | D |
 | FR-BOOTH-11 | The public screen MUST seal 10 s before the contest closes, showing an unambiguous sealed state rather than merely freezing, so a stale screen cannot be mistaken for a live one. | S | D |
 | FR-BOOTH-12 | Final standings MUST be reviewed before publication and revealed after the event, not at the venue. | M | I |
-| FR-BOOTH-13 | Submitted scores above the game's simulated physical maximum (4,200) MUST be rejected or flagged, since no sequence of taps can reach it. | M | T |
+| FR-BOOTH-13 | The engine MUST cap the effective tap rate at 20/s. Above that everyone scores identically, so scripting gains nothing and no genuine player is falsely accused. The earlier score ceiling of 4,200 sat above the curve's own asymptote of 4,040 and caught nothing. | M | T |
+| FR-BOOTH-14 | The app MUST accept up to 5 concurrent pointers and MUST state in its instructions that multiple fingers are allowed. Three fingers reaches 12–15 taps/s; silently discarding a third finger would penalise the best players with nothing on screen explaining why. | M | D |
+| FR-BOOTH-15 | Each booth session MUST settle on a **6-second** interval, phase-staggered per player (`offset = index × 6/N`). 60 players at 6 s is 10 tx/s, inside the pessimistic RPC budget (§13.4); unstaggered, the same load arrives as a 60-transaction spike every 6 s. | M | T |
+| FR-BOOTH-16 | Session opens MUST complete during the join window, before the round starts, and the final settlement MUST also serve as the close. Otherwise 60 opens and 60 closes add roughly 3 tx/s of bursts on top of steady settlement. | M | T |
 
 ### M9 — Demo control & observability
 
@@ -516,7 +519,7 @@ Defined in `2026-08-08-booth-frontend-design.md` §8. System-level obligations:
 | ID | Requirement | Target | Ver |
 |---|---|---|---|
 | NFR-P-1 | Settlement cadence per session | 1 Hz, configurable | D |
-| NFR-P-2 | Concurrent sessions sustained during the demo | ≥ 10 rehearsed and live. The 50-session stretch is **recorded, not live** — measurement (§13.4) puts 50 tx/s past the RPC knee | D |
+| NFR-P-2 | Concurrent sessions sustained during the demo | **60 live**, the whole room, at a 6-second settlement interval = 10 tx/s. Reached by lowering cadence rather than capping players; at 1 Hz the same 60 sessions need 60 tx/s and are impossible | D |
 | NFR-P-3 | Settlement visible on the wall after landing | ≤ 1 s | D |
 | NFR-P-4 | Dashboard frame rate at target concurrency | Readable, no visible stutter | D |
 | NFR-P-5 | Booth app frame rate on mid-range Android | 60 fps | T |
