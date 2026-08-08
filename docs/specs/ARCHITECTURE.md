@@ -1634,10 +1634,12 @@ project, not a flag.
 transaction**, `settleRoomAggregate`, from the team's funded wallet at the close of the
 pitch (FR-SPLIT-7/8, `REQUIREMENTS.md:800`).
 
-**Why.** It is what makes the split honest rather than a retreat. One transaction against
-a measured 10 tx/s ceiling is **tenfold margin**, confirms inside a second, and is
-genuinely explorer-verifiable. Netting off-chain metering into one on-chain settlement is
-an established pattern.
+**Why.** It is what makes the split honest rather than a retreat. One transaction is
+trivially safe at any observed rate — a single wallet has run **60 tx/s clean**
+(`REQUIREMENTS.md:728`) — it confirms inside a second, and it is genuinely
+explorer-verifiable. Netting off-chain metering into one on-chain settlement is an
+established pattern. *(The baseline first argued this as "tenfold margin against a 10 tx/s
+ceiling"; that ceiling was retracted and the argument only got stronger.)*
 
 **Cost.** One contract entry point, a pre-signed transaction with retry, and a rehearsal
 aggregate minted at T-10min. If the live send stalls past five seconds the rehearsal hash
