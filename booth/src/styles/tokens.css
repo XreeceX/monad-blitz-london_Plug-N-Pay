@@ -1,44 +1,91 @@
-/* Apple Wallet / HIG tokens — booth/DESIGN.md
-   Legacy --cyan* names kept so game SVG paths keep resolving. */
+/* iOS 18 / macOS Sequoia tokens — booth/DESIGN.md
+   Design language follows jerald-devOfficial/apple-ui-portfolio: vibrancy
+   materials (blur + saturate), 0.5px hairlines with an inset specular edge,
+   layered shadows, continuous-corner squircles.
+   Legacy --cyan* / --surface / --line names kept so game SVG paths keep
+   resolving — SVG cannot sample a backdrop, so those stay opaque. */
 
 :root {
+  /* ---- ground ---- */
   --ink:        #000000;
-  --surface:    #1C1C1E;
+  --surface:    #1C1C1E;   /* opaque — SVG fills, non-blurring fallbacks */
   --surface-2:  #2C2C2E;
   --line:       #262629;
-  --glass:      rgba(255, 255, 255, 0.12);
-  --cyan:       #0A84FF;   /* system blue — accent / energy */
-  --cyan-dim:   #3A6FA8;   /* low draw, inactive */
-  --cyan-hot:   #64B5FF;   /* peak draw */
+
+  /* ---- vibrancy materials (Sequoia) ---- */
+  --mat-blur:      blur(40px) saturate(180%);
+  --mat-blur-thin: blur(24px) saturate(160%);
+  --mat-thick:     rgba(44, 44, 46, 0.82);   /* sheets, cards, lists */
+  --mat-regular:   rgba(58, 58, 60, 0.58);   /* rows, inset groups */
+  --mat-thin:      rgba(120, 120, 128, 0.24); /* chips, controls */
+  --mat-bar:       rgba(0, 0, 0, 0.6);        /* menu bar / status chrome */
+  --mat-line:      rgba(255, 255, 255, 0.12); /* hairline on a material */
+  --mat-edge:      inset 0 0 0 0.5px rgba(255, 255, 255, 0.06); /* specular */
+  --glass:         var(--mat-thin);           /* legacy alias */
+
+  /* ---- text ---- */
   --text:       #FFFFFF;
   --muted:      #A0A0A5;
   --muted-3:    #636368;
+
+  /* ---- accent ---- */
+  --cyan:       #0A84FF;   /* system blue — accent / energy */
+  --cyan-dim:   #3A6FA8;   /* low draw, inactive */
+  --cyan-hot:   #64B5FF;   /* peak draw */
   --success:    #30D158;
   --danger:     #FF453A;
   --monad:      #6E54FF;   /* attribution only */
-  --radius:     10px;      /* Wallet card frame */
-  --radius-cta: 14px;      /* Pay Now / sheet */
+
+  /* ---- geometry (iOS 18 continuous corners) ---- */
+  --radius:     18px;      /* card / grouped panel */
+  --radius-cta: 14px;      /* buttons, sheets */
+  --radius-sm:  12px;      /* inner tiles, QR frame */
   --space:      8px;
-  --shadow-card: 0 8px 24px rgba(0, 0, 0, 0.5);
+
+  /* ---- depth ---- */
+  --shadow-card:
+    0 8px 28px rgba(0, 0, 0, 0.45),
+    0 2px 8px rgba(0, 0, 0, 0.25);
+  --shadow-lift:
+    0 18px 48px rgba(0, 0, 0, 0.55),
+    0 4px 12px rgba(0, 0, 0, 0.3);
+
+  /* ---- motion ---- */
+  --ease:        cubic-bezier(0.4, 0, 0.2, 1);   /* Apple standard */
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);  /* settle / present */
+
+  /* Ambient Sequoia wallpaper. Materials need something behind them to sample;
+     dim enough that the game stage keeps its contrast. */
+  --wallpaper:
+    radial-gradient(ellipse 80% 60% at 15% -10%, rgba(10, 132, 255, 0.14), transparent 65%),
+    radial-gradient(ellipse 70% 50% at 95% 8%, rgba(110, 84, 255, 0.1), transparent 65%),
+    radial-gradient(ellipse 90% 60% at 50% 115%, rgba(10, 132, 255, 0.07), transparent 70%);
+
   --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display',
-    'Helvetica Neue', Helvetica, Arial, sans-serif;
+    'Segoe UI', Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --titanium: linear-gradient(135deg, #E8E8EB 0%, #A8A8AD 48%, #3D3D3F 100%);
 }
 
-/* V2G Flip — success green takeover (Wallet payment-success moment). */
+/* V2G Flip — success green takeover (payment-success moment). */
 [data-phase='v2g'] {
-  --ink:      #30D158;
-  --surface:  #248A3D;
-  --surface-2:#1A6B2E;
-  --line:     #0A3D18;
-  --glass:    rgba(0, 0, 0, 0.12);
-  --cyan:     #000000;
-  --cyan-dim: #0A3D18;
-  --cyan-hot: #000000;
-  --text:     #000000;
-  --muted:    #0A3D18;
-  --muted-3:  #0A3D18;
+  --ink:        #30D158;
+  --surface:    #248A3D;
+  --surface-2:  #1A6B2E;
+  --line:       #0A3D18;
+  --mat-thick:  rgba(26, 107, 46, 0.82);
+  --mat-regular:rgba(10, 61, 24, 0.5);
+  --mat-thin:   rgba(0, 0, 0, 0.16);
+  --mat-line:   rgba(0, 0, 0, 0.18);
+  --mat-edge:   inset 0 0 0 0.5px rgba(255, 255, 255, 0.14);
+  --glass:      var(--mat-thin);
+  --cyan:       #000000;
+  --cyan-dim:   #0A3D18;
+  --cyan-hot:   #000000;
+  --text:       #000000;
+  --muted:      #0A3D18;
+  --muted-3:    #0A3D18;
+  --wallpaper:  none;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -46,7 +93,9 @@
 html, body {
   overscroll-behavior: none;
   height: 100%;
+  height: 100dvh;
   background: var(--ink);
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
@@ -56,6 +105,7 @@ body {
   line-height: 1.3;
   letter-spacing: -0.4px;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 #root { height: 100%; }
@@ -73,21 +123,33 @@ body {
   font-feature-settings: 'tnum' 1;
 }
 
+/* ---- controls: vibrant capsule, Apple Pay CTA ---- */
+
 button {
   font: inherit;
+  font-weight: 500;
   letter-spacing: -0.4px;
   color: var(--text);
-  background: var(--glass);
-  border: none;
+  background: var(--mat-thin);
+  backdrop-filter: var(--mat-blur-thin);
+  -webkit-backdrop-filter: var(--mat-blur-thin);
+  border: 0.5px solid var(--mat-line);
   border-radius: var(--radius-cta);
+  box-shadow: var(--mat-edge);
   padding: 14px 20px;
   min-height: 50px;
   cursor: pointer;
-  transition: opacity 160ms ease, transform 160ms ease;
+  transition: opacity 160ms var(--ease), transform 160ms var(--ease),
+    background-color 160ms var(--ease), box-shadow 160ms var(--ease);
 }
 
-button:active { opacity: 0.85; transform: scale(0.98); }
+button:active { opacity: 0.85; transform: scale(0.97); }
 button:disabled { opacity: 0.4; cursor: default; transform: none; }
+
+button:focus-visible {
+  outline: none;
+  box-shadow: var(--mat-edge), 0 0 0 3.5px rgba(10, 132, 255, 0.55);
+}
 
 button.primary {
   background: #FFFFFF;
@@ -95,10 +157,16 @@ button.primary {
   font-weight: 600;
   font-size: 17px;
   min-height: 54px;
+  border: none;
   border-radius: var(--radius-cta);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: var(--shadow-card);
 }
 
-.hairline-top { border-top: 0.5px solid var(--line); }
+button.primary:active { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35); }
+
+.hairline-top { border-top: 0.5px solid var(--mat-line); }
 
 .label {
   font-size: 13px;
@@ -108,34 +176,54 @@ button.primary {
   color: var(--muted);
 }
 
-/* Permanent honesty label — FR-SPLIT-5 / FR-MET-5. */
+/* Permanent honesty label — FR-SPLIT-5 / FR-MET-5.
+   macOS menu-bar vibrancy: always legible, never dressed up as hardware. */
 .sim-label {
   position: fixed;
-  top: env(safe-area-inset-top, 0px);
-  left: 0;
-  right: 0;
+  top: calc(env(safe-area-inset-top, 0px) + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100vw - 32px);
   text-align: center;
-  padding: 6px 8px;
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: var(--mat-bar);
+  backdrop-filter: var(--mat-blur);
+  -webkit-backdrop-filter: var(--mat-blur);
+  border: 0.5px solid var(--mat-line);
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.07px;
-  color: var(--muted-3);
+  color: var(--muted);
   z-index: 100;
   pointer-events: none;
 }
 
-.pass-card {
-  background: var(--surface);
+/* ---- materials ---- */
+
+.pass-card,
+.material {
+  background: var(--mat-thick);
+  backdrop-filter: var(--mat-blur);
+  -webkit-backdrop-filter: var(--mat-blur);
+  border: 0.5px solid var(--mat-line);
   border-radius: var(--radius);
-  box-shadow:
-    var(--shadow-card),
-    inset 0 0.5px 0 rgba(255, 255, 255, 0.08);
+  box-shadow: var(--shadow-card), var(--mat-edge);
   overflow: hidden;
 }
 
 .pass-card.titanium {
   background: var(--titanium);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   color: #1A1A1A;
+}
+
+/* Blur is expensive on the per-tick game screens — opt out there. */
+@supports not (backdrop-filter: blur(1px)) {
+  .pass-card, .material, button, .sim-label {
+    background: var(--surface);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
