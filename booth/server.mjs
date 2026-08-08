@@ -14,10 +14,16 @@ const ROOM_TTL_MS = 2 * 60 * 60 * 1000 // 2h
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 
 /** @typedef {{ deviceId: string, nick: string, carId: string, carName: string, hue: number, joinedAt: number, lastSeen: number, bestScore: number }} Player */
-/** @typedef {{ id: string, hostToken: string, status: 'lobby'|'live'|'ended', createdAt: number, startedAt: number|null, players: Map<string, Player>, scores: Map<string, { nick: string, score: number, carName: string, at: number }> }} Room */
+/** @typedef {{ id: string, hostToken: string, status: 'lobby'|'live'|'ended', createdAt: number, startedAt: number|null, players: Map<string, Player>, scores: Map<string, { nick: string, score: number, carName: string, at: number }>, totalWh: number, totalMon: number }} Room */
+/** @typedef {{ sessionId: string, deviceId: string, nick: string, carId: string, roomId: string|null, lastSeq: number, lastKW: number, totalWh: number, totalMon: number, priceMonPerKwh: number, v2gMonPerKwh: number, lastSeen: number, ended: boolean }} LiveSession */
 
 /** @type {Map<string, Room>} */
 const rooms = new Map()
+/** @type {Map<string, LiveSession>} */
+const sessions = new Map()
+
+/** A session counts as "live" on the wall while ticks arrived within this window. */
+const LIVE_MS = 5_000
 
 function code(n = 4) {
   const bytes = randomBytes(n)
@@ -105,6 +111,8 @@ app.post('/api/room', (_req, res) => {
     startedAt: null,
     players: new Map(),
     scores: new Map(),
+    totalWh: 0,
+    totalMon: 0,
   }
   rooms.set(id, room)
   res.json({ roomId: id, hostToken, serverNow: Date.now() })
@@ -159,32 +167,118 @@ app.post('/api/room/:id/reset', (req, res) => {
   res.json(publicRoom(room))
 })
 
-// Existing booth contract stubs — enough for the demo path; friend can harden.
 app.post('/api/session', (req, res) => {
-  const { deviceId } = req.body ?? {}
+  const body = req.body ?? {}
+  const deviceId = String(body.deviceId ?? '')
+  const nick = String(body.nickname ?? 'DRIVER').slice(0, 24)
+  const carId = String(body.carId ?? '')
+  const roomId = body.roomId ? String(body.roomId).toUpperCase() : null
+  const priceMonPerKwh = Number(body.priceMonPerKwh) || 0.12
+  const v2gMonPerKwh = Number(body.v2gMonPerKwh) || 0.3
+  const sessionId = `s-${deviceId.slice(0, 8) || 'anon'}-${Date.now().toString(36)}`
+
+  /** @type {LiveSession} */
+  const sess = {
+    sessionId,
+    deviceId,
+    nick,
+    carId,
+    roomId: roomId && rooms.has(roomId) ? roomId : roomId,
+    lastSeq: 0,
+    lastKW: 0,
+    totalWh: 0,
+    totalMon: 0,
+    priceMonPerKwh,
+    v2gMonPerKwh,
+    lastSeen: Date.now(),
+    ended: false,
+  }
+  sessions.set(sessionId, sess)
+
   res.json({
-    sessionId: `s-${deviceId?.slice(0, 8) ?? 'anon'}-${Date.now().toString(36)}`,
+    sessionId,
     startAt: Date.now(),
     serverNow: Date.now(),
     surgeWindows: [
       [4000, 6000],
       [10500, 12500],
     ],
-    priceMonPerKwh: 0.12,
-    v2gMonPerKwh: 0.3,
+    priceMonPerKwh,
+    v2gMonPerKwh,
+    label: 'SIMULATION — same engine, nothing on-chain',
   })
 })
 
-app.post('/api/tick', (_req, res) => res.sendStatus(204))
+app.post('/api/tick', (req, res) => {
+  const body = req.body ?? {}
+  const sessionId = String(body.sessionId ?? '')
+  const sess = sessions.get(sessionId)
+  if (!sess || sess.ended) return res.sendStatus(204)
+
+  const seq = Number(body.seq) || 0
+  // Idempotent on seq: ignore stale/replayed batches (FR-SPLIT / booth §8).
+  if (seq > 0 && seq <= sess.lastSeq) return res.sendStatus(204)
+  if (seq > 0) sess.lastSeq = seq
+
+  const ticks = Array.isArray(body.ticks) ? body.ticks : []
+  let batchWh = 0
+  let batchMon = 0
+  let lastKW = sess.lastKW
+  for (const t of ticks) {
+    const kW = Number(t?.kW) || 0
+    const whDelta = Math.abs(Number(t?.whDelta) || 0)
+    lastKW = kW
+    batchWh += whDelta
+    // Display aggregate only — charge rate; V2G premium is reflected in score, not this meter.
+    batchMon += (whDelta / 1000) * sess.priceMonPerKwh
+  }
+  sess.lastKW = lastKW
+  sess.totalWh += batchWh
+  sess.totalMon += batchMon
+  sess.lastSeen = Date.now()
+
+  // Bind to a room if the phone omitted roomId — match the joined player seat.
+  if (!sess.roomId || !rooms.has(sess.roomId)) {
+    for (const room of rooms.values()) {
+      if (room.players.has(sess.deviceId)) {
+        sess.roomId = room.id
+        break
+      }
+    }
+  }
+  if (sess.roomId && rooms.has(sess.roomId)) {
+    const room = rooms.get(sess.roomId)
+    room.totalWh += batchWh
+    room.totalMon += batchMon
+  }
+
+  res.sendStatus(204)
+})
 
 app.post('/api/session/end', (req, res) => {
   const { sessionId, score } = req.body ?? {}
+  const sess = sessionId ? sessions.get(String(sessionId)) : null
+  if (sess) {
+    sess.ended = true
+    sess.lastKW = 0
+    sess.lastSeen = Date.now()
+  }
+
   // Prefer room-scoped scores when a roomId is provided
-  const roomId = req.body?.roomId ? String(req.body.roomId).toUpperCase() : null
-  const nick = String(req.body?.nickname ?? 'DRIVER')
+  const roomId = (req.body?.roomId ? String(req.body.roomId) : sess?.roomId ?? '')
+    .toUpperCase() || null
+  const nick = String(req.body?.nickname ?? sess?.nick ?? 'DRIVER')
   const carName = String(req.body?.carName ?? '')
-  const deviceId = String(req.body?.deviceId ?? sessionId ?? 'x')
+  const deviceId = String(req.body?.deviceId ?? sess?.deviceId ?? sessionId ?? 'x')
   const sc = Math.round(Number(score) || 0)
+
+  // If client never opened a room-scoped session, attach ended Wh to the live room once.
+  if (sess && !sess.roomId && roomId && rooms.has(roomId)) {
+    sess.roomId = roomId
+    const room = rooms.get(roomId)
+    room.totalWh += sess.totalWh
+    room.totalMon += sess.totalMon
+  }
 
   if (roomId && rooms.has(roomId)) {
     const room = rooms.get(roomId)
@@ -232,7 +326,9 @@ app.get('/api/leaderboard', (req, res) => {
 
 app.get('/api/wall', (req, res) => {
   const roomId = req.query.room ? String(req.query.room).toUpperCase() : null
-  const room = roomId ? rooms.get(roomId) : [...rooms.values()].find((r) => r.status === 'live') ?? [...rooms.values()][0]
+  const room = roomId
+    ? rooms.get(roomId)
+    : [...rooms.values()].find((r) => r.status === 'live') ?? [...rooms.values()][0]
   if (!room) {
     return res.json({
       players: [],
@@ -242,25 +338,53 @@ app.get('/api/wall', (req, res) => {
       count: 0,
       surgeAt: null,
       status: 'idle',
+      label: 'SIMULATION — same engine, nothing on-chain',
     })
   }
-  const players = [...room.players.values()].map((p) => ({
-    id: p.deviceId,
-    nick: p.nick,
-    hue: p.hue,
-    kW: 0,
-    soc: 0,
-    phase: room.status === 'live' ? 'charge' : 'idle',
-  }))
+
+  const now = Date.now()
+  /** @type {Map<string, LiveSession>} */
+  const byDevice = new Map()
+  for (const sess of sessions.values()) {
+    if (sess.roomId && sess.roomId !== room.id) continue
+    if (!sess.roomId && !room.players.has(sess.deviceId)) continue
+    const prev = byDevice.get(sess.deviceId)
+    if (!prev || sess.lastSeen > prev.lastSeen) byDevice.set(sess.deviceId, sess)
+  }
+
+  let totalKW = 0
+  const players = [...room.players.values()].map((p) => {
+    const sess = byDevice.get(p.deviceId)
+    const live = Boolean(sess && !sess.ended && now - sess.lastSeen <= LIVE_MS)
+    const kW = live ? sess.lastKW : 0
+    totalKW += kW
+    return {
+      id: p.deviceId,
+      nick: p.nick,
+      hue: p.hue,
+      kW,
+      soc: 0,
+      phase: live ? 'charge' : room.status === 'live' ? 'idle' : 'idle',
+    }
+  })
+
+  // Also count live sessions that joined via ticks but somehow missed the player map
+  for (const sess of byDevice.values()) {
+    if (room.players.has(sess.deviceId)) continue
+    const live = !sess.ended && now - sess.lastSeen <= LIVE_MS
+    if (live) totalKW += sess.lastKW
+  }
+
   res.json({
     players,
-    totalKW: 0,
-    totalWh: 0,
-    totalMon: 0,
+    totalKW,
+    totalWh: room.totalWh,
+    totalMon: room.totalMon,
     count: players.length,
     surgeAt: null,
     status: room.status,
     roomId: room.id,
+    label: 'SIMULATION — same engine, nothing on-chain',
   })
 })
 

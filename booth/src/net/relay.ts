@@ -60,8 +60,13 @@ export async function startSession(
   deviceId: string,
   nickname: string,
   carId: string,
+  roomId?: string | null,
 ): Promise<SessionConfig> {
-  const remote = await post<SessionConfig>('/session', { deviceId, nickname, carId }, 1500)
+  const remote = await post<SessionConfig>(
+    '/session',
+    { deviceId, nickname, carId, roomId: roomId || undefined },
+    1500,
+  )
   if (remote && remote.sessionId) {
     clockOffset = remote.serverNow - Date.now()
     return remote

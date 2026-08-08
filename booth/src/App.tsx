@@ -92,13 +92,13 @@ export default function App() {
   }, [])
 
   const onPlugged = useCallback(() => {
-    sessionRef.current = startSession(state.deviceId, state.nickname, state.car.id)
+    sessionRef.current = startSession(state.deviceId, state.nickname, state.car.id, roomId)
     void sessionRef.current.then((cfg) => {
       bindTickSession(cfg.sessionId)
       setSession(cfg)
     })
     dispatch({ type: 'go', screen: 'handshake' })
-  }, [state.deviceId, state.nickname, state.car.id, dispatch])
+  }, [state.deviceId, state.nickname, state.car.id, roomId, dispatch])
 
   const onHandshakeDone = useCallback(() => {
     dispatch({ type: 'go', screen: 'charging' })
