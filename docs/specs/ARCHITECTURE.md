@@ -259,20 +259,31 @@ described as the production path rather than dropped in silence.
 
 ## 4. The RPC budget
 
-> ### ⚠ SUPERSEDED IN PART — READ §17 FIRST
+> ### 🔴 BOTH RPC CEILINGS RETRACTED — no number in this section is a capacity limit
 >
-> This section was written when only the **read** path had been measured. The **write**
-> path has since been measured at **10 tx/s from a single wallet**
-> (`REQUIREMENTS.md:725-736`), and the booth has been split off-chain entirely
-> (`REQUIREMENTS.md:767`). Two claims below are now wrong:
+> **Retracted at source**, commit `d47a36c`, `REQUIREMENTS.md:726-740`. **Neither
+> "40–45 req/s" nor "10 tx/s" may be quoted as a capacity limit anywhere, by anyone.**
 >
-> - **"26% of the ceiling, 4× headroom" is wrong.** Against the measured *write*
->   ceiling of 10 tx/s, a 10 tx/s budget is **100% with zero margin**.
-> - **The booth rows are moot.** Booth sessions make zero chain calls (FR-SPLIT-1).
+> A re-test from the same wallet returned **25 tx/s: 75/75 clean · 40 tx/s: 109/120 ·
+> 60 tx/s: 180/180 clean**. **A failure rate that does not rise with load is not a
+> ceiling.** The 40 tx/s losses were all `The request timed out`, and the same wallet
+> then ran 60 tx/s without a single failure. The read measurement has the identical
+> defect — 3 refusals in 270 at 45 req/s called a knee on the same reasoning. Every run
+> used the shared public key `0x…0001`, whose nonce moved 20 → 89 between runs, so
+> strangers were transacting from it and contention was never ruled out.
 >
-> The read-path table in §4.1 and the per-call inventory in §4.2 remain accurate and
-> useful. **§17.2 carries the corrected budget.** Superseded rather than rewritten, per
-> the project's own rule that a subordinate document gets a superseded-note.
+> **Use instead: at least 60 tx/s single-wallet, ceiling unknown, expect ~1–3% transient
+> timeouts at any rate.**
+>
+> Three claims below are void: the **"knee"** in §4.1, the **"26% / 4× headroom"** in
+> §4.2, and §4.3's reasoning about N=50 (its *conclusion* survives on other grounds —
+> see §16.10). The booth rows are moot for a separate reason (FR-SPLIT-1).
+>
+> **The one durable finding: transient timeouts occur at a low single-digit rate at every
+> load tested, so the relay needs retry** — which it needed anyway (§8, §M5.9).
+>
+> **§16.10 carries the corrected position.** Kept rather than deleted because three
+> decisions were made on these numbers and the record should show why.
 
 The bottleneck. Everything else in this document is downstream of this table.
 
@@ -400,19 +411,27 @@ not a default.
 
 ## 5. The wallet pool model
 
-> ### ⚠ SUPERSEDED — the pool is **2–3 wallets and ~30 MON**, not 10 and 150. See §16.8
+> ### 🔴 THE WALLET POOL IS NOT SUPPORTED BY EVIDENCE — do not build it before freeze
 >
-> This section derived 6–10 wallets from a 600 ms occupancy model. **The write
-> measurement contradicts that derivation: one wallet sustained 10 tx/s clean**
-> (`REQUIREMENTS.md:731`). Measurement beats derivation. §16.8 reconciles the two models,
-> says which governs, and explains what the 600 ms figure actually represents.
+> **`REQUIREMENTS.md:737`:** *"FR-REL-8's wallet pool is not supported by evidence. A
+> single wallet sustained 60 tx/s… the pool should not be built on this measurement."*
 >
-> The load also shrank: §16 removed 60 booth players from the chain, so ~10 simulated
-> sessions plus one aggregate is all that remains. **The pool is now a margin question,
-> not a capacity question**, and the funding problem drops from 150 MON to ~30 MON.
+> Every sizing in this section is void. It derived 6–10 wallets from a 600 ms occupancy
+> model, then §16.8 re-derived 2–3 from a 10 tx/s measurement. **Both inputs are gone:**
+> the occupancy model was wrong (§16.8 explains how), and the measurement it was corrected
+> against has been retracted.
 >
-> §5.1's reasoning about nonce ordering and §5.5's bring-up procedure remain correct and
-> load-bearing. Only the **count** and the **MON total** are superseded.
+> **Current position: one wallet, and FR-REL-8 downgraded to optional-unproven.** A single
+> wallet ran 60 tx/s clean — six times the entire rail load. Ten sessions at 1 Hz is
+> nowhere near any observed limit.
+>
+> **What survives and still matters:** §5.1's nonce-ordering argument (unproven at demo
+> rates, not disproven), §5.3's **10 MON reserve floor** — a real documented rule with a
+> real throttle below it — and §5.5's bring-up procedure with the 3-block funding delay.
+> Funding one wallet above the floor is ~12–15 MON: **one faucet claim, no consolidation
+> exercise.**
+>
+> **§16.10 carries the corrected position and names the measurement that would settle it.**
 
 ### 5.1 Why a pool exists at all
 
@@ -1654,21 +1673,28 @@ mismatch count. Display feature, not an architectural correction.
 
 ### ADR-8 · A fixed 10 tx/s settlement budget, with cadence and concurrency trading against it
 
-**Decision.** The architecture targets a constant **10 tx/s**. Session count and cadence
-are the free variables: `N ÷ T = 10`.
+**Decision.** The rail runs **~10 simulated sessions at 1 Hz ≈ 10 tx/s**, plus one
+aggregate at the close. `N ÷ T` remains the shape, but **10 tx/s is a design target, not
+a ceiling** — see §16.10.
 
-**Why.** It converts the project's most dangerous unknown into one number that every
-other decision can be checked against. It is why 10 sessions at 1 Hz (AC-5) and 60
-sessions at 6 s (NFR-P-2) are the same load, and why the substitution law in §9.1 closes
-exactly.
+**⚠ The original rationale is void.** This ADR was written to convert "the project's most
+dangerous unknown" into one budgeted number, and it justified 10 tx/s as 26% of a measured
+40 req/s knee. **Both measurements were retracted** (`REQUIREMENTS.md:726-740`): the knee
+was noise, and a single wallet has since run **60 tx/s clean**. The substitution law it
+also justified is separately moot — §16 removed the crowd from the chain.
 
-**Cost.** The headline concurrency figure now requires a cadence qualifier in every
-public statement — which is what §4.3 fixes in the presenter's line.
+**Why 10 tx/s anyway.** It is what AC-5's ten concurrent sessions at NFR-P-1's 1 Hz
+produce (`REQUIREMENTS.md:598`, `:521`). The number now follows from the requirements
+rather than from a capacity constraint, which is the right direction of causation and was
+not true before.
 
-**Reversal trigger.** Raise the budget only on a **measured** write-path number with the
-same 4× margin the current one carries: a sustained 40 tx/s write measurement would
-justify a 20 tx/s budget with a 2× margin, and even then only with a re-measurement taken
-at the venue on the day (§11 C3).
+**Cost.** None that binds. Under 17% of observed single-wallet throughput.
+
+**Reversal trigger.** None needed for headroom. **Reduce** the session count only if a
+venue-network measurement close to the pitch shows sustained failures that *rise with
+load* — the test the retracted measurements failed to apply to themselves. A flat
+single-digit timeout rate is not a reason to reduce anything; it is a reason to retry
+(§16.10).
 
 ---
 
@@ -1874,6 +1900,97 @@ simulated sessions rather than ten.**
 fee too low" and the tool reported a fabricated ceiling below 2 tx/s. **Read fees from
 the chain per run.** A measurement tool that reports a capacity limit which is actually a
 client-side fee bug is worse than no measurement.
+
+---
+
+## 16.10 🔴 Both RPC measurements retracted — the corrected position
+
+**This supersedes §4's budget, §5's pool sizing, §16.5's zero-margin alarm, §16.7's
+"single most important number", and §16.8's re-derivation.** Retracted at source, commit
+`d47a36c`, `REQUIREMENTS.md:726-740`.
+
+### What was wrong
+
+| Claimed | Actually |
+|---|---|
+| Read knee at **40–45 req/s** | 3 refusals in 270 at 45, 4 in 300 at 50 — **noise read as a knee** |
+| Write ceiling at **10 tx/s** | 30/30 clean at 10, 43/45 at 15 — **a 4% loss read as rate limiting** |
+| The design sits at **100% of ceiling** | **False alarm.** Ten sessions at 1 Hz is nowhere near any observed limit |
+
+**The re-test that broke it:** 25 tx/s → 75/75 clean · 40 tx/s → 109/120 · **60 tx/s →
+180/180 clean**. A failure rate that does not rise with load is not a ceiling. The 40 tx/s
+losses were all `The request timed out`, and the *same wallet* then ran 60 tx/s
+flawlessly.
+
+**The methodological error, worth naming because it is easy to repeat:** a small
+single-digit failure count at one rate was treated as the onset of throttling without
+checking whether it *rose* with load. It did not. Both runs also used the shared public
+key `0x…0001`, whose nonce moved **20 → 89 between runs** — strangers were actively
+transacting from it, and contention was never ruled out.
+
+### The corrected numbers
+
+> **Write capacity: at least 60 tx/s single-wallet. Ceiling unknown. Expect ~1–3%
+> transient timeouts at any rate.**
+
+Against that, the whole rail — ~10 simulated sessions at 1 Hz plus one aggregate — uses
+**under 17% of what one wallet has been observed to sustain**, with the true ceiling
+higher and unmeasured.
+
+### Three consequences
+
+**1. Run ten sessions, not nine.** My earlier recommendation to drop to nine for margin is
+withdrawn — it was mitigating a limit that does not exist. **AC-5 requires at least ten**
+(`REQUIREMENTS.md:598`), and ten is comfortable.
+
+**2. FR-REL-8's wallet pool: optional, unproven, do not build it before freeze.** One
+wallet sustained 60 tx/s. The nonce-serialisation argument in §5.1 rests on documented
+behaviour — no global mempool, strict per-account ordering — and **may still hold at some
+higher rate**, but nothing measured demonstrates it at demo rates. The analysis is kept,
+not deleted, because it is sound reasoning about a real constraint that simply does not
+bind here.
+
+> **The measurement that would prove it** (`REQUIREMENTS.md:740`): several **own funded**
+> wallets, from the **venue network**, close to the pitch — comparing single-wallet
+> against pooled throughput at rising rates. Until someone runs that, FR-REL-8 is
+> unproven in both directions. **It is not worth the hours before freeze.** One funded
+> wallet above the 10 MON reserve floor is the plan.
+
+**3. The one durable finding is retry.** Transient timeouts appeared at a low single-digit
+rate at *every* load tested, including rates that were otherwise clean. The relay must
+retry — which §8's ladder and §M5.9 already required for other reasons. **A finding that
+survives the retraction of the measurement that produced it is worth more than the
+measurement was.**
+
+### Why §16's split is not reopening
+
+Part of §16's justification was these numbers, and that part is void. The baseline says so
+explicitly rather than hiding it (`REQUIREMENTS.md:738`). It stands on the reasons that
+never depended on them:
+
+- The crowd path no longer relies on public infrastructure the team does not control.
+- **The demo cannot be taken down by someone else's traffic** — which the `0x…0001` nonce
+  moving 20 → 89 mid-measurement demonstrates is a live hazard, not a hypothetical.
+- Player count is unbounded.
+
+Those were the owner's reasons and they are unaffected. **Reopening a specced, agreed
+architecture this late on a corrected number would cost more than it could win.** Recorded
+because deciding well under uncertainty is a different skill from deciding correctly with
+good data, and this is an example of the former.
+
+### What this does to the earlier sections
+
+| Section | Status |
+|---|---|
+| §4.1 "the knee is between 40 and 45" | **Void.** Table retained; the interpretation is withdrawn |
+| §4.2 "26% of ceiling, 4× headroom" | **Void** — both numerator and denominator were unsound |
+| §4.3 N=50 verdict | **Conclusion survives, reasoning replaced.** N=50 at 1 Hz is moot regardless: §16 removed the crowd from the chain, so nothing proposes 50 on-chain sessions. NFR-P-2 is now ~10 simulated |
+| §5.2 / §5.4 pool sizing and 150 MON | **Void** — see the §5 banner |
+| §16.5 zero-margin budget | **Void** — false alarm |
+| §16.7 "single most important number" | **Void as framed.** The re-run is now a nice-to-have, not a gate |
+| §16.8 re-derivation to 2–3 wallets | **Void as a conclusion.** Its diagnosis of *my* occupancy error stands and is still worth reading |
+| §16.9 `eth_sendRawTransactionSync` unverified | **Stands.** Untouched by this retraction — still never called against this endpoint |
+| §8 degradation ladder | **Strengthened.** Retry and the cadence ladder are now the *primary* justified mitigations |
 
 ---
 
