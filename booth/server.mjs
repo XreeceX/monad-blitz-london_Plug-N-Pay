@@ -249,10 +249,10 @@ app.get('/api/wall', (req, res) => {
   })
 })
 
-// Production: serve the built SPA
+// Production: serve the built SPA (Express 5 needs named wildcards, not '*')
 const dist = join(__dirname, 'dist')
 app.use(express.static(dist))
-app.get('*', (req, res, next) => {
+app.get('/{*path}', (req, res, next) => {
   if (req.path.startsWith('/api')) return next()
   res.sendFile(join(dist, 'index.html'))
 })
