@@ -86,11 +86,15 @@ export const CFG = {
   N_BOOTH_MAX:         60,                 // NFR-P-2, IF-10
   RAMP_MAX_PER_SEC:    2,                  // FR-SIM-5, no self-inflicted spike
 
-  // ── wallet pool (ARCHITECTURE.md §5) ───────────────────────────────────
-  POOL_SIZE:           10,                 // 6 is the hard floor
-  POOL_MIN_WALLETS:    6,
-  RESERVE_FLOOR_MON:   10,                 // concepts/references/reserve-balance.md:3
-  WALLET_TARGET_MON:   15,                 // floor + burn + rehearsal margin
+  // ── wallets (ARCHITECTURE.md §16.10) ───────────────────────────────────
+  //   POOL_SIZE was 10, then 2-3. BOTH derivations are void: the measurements
+  //   behind them were RETRACTED (REQUIREMENTS.md:726-740). One wallet ran
+  //   60 tx/s clean. FR-REL-8 is optional-unproven — do NOT build the pool
+  //   before freeze. The array shape stays so adding wallets remains config.
+  POOL_SIZE:            1,                 // one funded wallet; 60 tx/s observed
+  POOL_MIN_WALLETS:     1,
+  RESERVE_FLOOR_MON:   10,                 // reserve-balance.md:3 — REAL, still binds
+  WALLET_TARGET_MON:   15,                 // floor + burn. One faucet claim
   BALANCE_POLL_MS:     5000,
 
   // ── gas (measure in W1, then freeze these) ─────────────────────────────
@@ -1733,11 +1737,22 @@ cellular when venue wifi degrades (`REQUIREMENTS.md:823`). See `ARCHITECTURE.md`
 sides use, so 'same engine, simulated' is true by construction rather than by
 assertion."*
 
-**Take the SHOULD as a MUST.** If the two sides diverge, the claim becomes an assertion a
-reviewer cannot check, and the symmetry in FR-SPLIT-5's paired labels is what makes the
-whole split read as rigour rather than as a retreat. Extract `whDelta × rate` into one
-JS module; the Solidity `settle()` mirrors it, and a single test asserts the two agree
-across a table of inputs.
+### ⬆ Upgraded SHOULD → MUST — confirmed by the run lead, 2026-08-08
+
+**FR-SPLIT-5 puts `SIMULATION — same engine, nothing on-chain` permanently on sixty
+phones.** If the booth engine and the rail engine can drift, that label asserts something
+**nobody can check** — which is precisely the class of unverifiable claim FR-SPLIT-2
+exists to prevent. A `SHOULD` would let the honesty claim rot silently: the label stays on
+screen, correct on the day it was written, quietly false a commit later.
+
+The two requirements only work together. FR-SPLIT-2 bans anything that *looks* verifiable
+but isn't; FR-SPLIT-5 puts a claim about engine equivalence in front of the whole room.
+**Shared code is what keeps the second from violating the spirit of the first.**
+
+**Implementation:** extract `whDelta × rate` into one JS module. The Solidity `settle()`
+mirrors it, and a single test asserts the two agree across a table of inputs — including
+the truncation edge, since §M4.4 divides by `1_000_000` and integer truncation is exactly
+where two implementations of "the same" arithmetic drift apart first.
 
 ### M10.2 Endpoints
 
