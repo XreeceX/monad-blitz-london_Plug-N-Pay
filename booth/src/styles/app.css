@@ -1031,6 +1031,7 @@
 
 .wall-stat { display: flex; flex-direction: column; gap: 4px; }
 .wall-stat-value { font-size: 40px; font-weight: 700; color: var(--text); line-height: 1; letter-spacing: 0.4px; }
+.wall-stat-v2g .wall-stat-value { color: var(--success); }
 
 .wall-sealed {
   align-items: center;

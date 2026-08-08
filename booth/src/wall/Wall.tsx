@@ -141,7 +141,7 @@ export function Wall() {
         <aside className="wall-side">
           <div className="wall-stat">
             <span className="num wall-stat-value">{wall?.count ?? 0}</span>
-            <span className="label">CARS LIVE NOW</span>
+            <span className="label">CARS IN ROOM</span>
           </div>
           <div className="wall-stat">
             <span className="num wall-stat-value">{Math.round(wall?.totalKW ?? 0)}</span>
@@ -150,6 +150,15 @@ export function Wall() {
           <div className="wall-stat">
             <span className="num wall-stat-value">{fmtWh(wall?.totalWh ?? 0)}</span>
             <span className="label">TOTAL Wh MOVED</span>
+          </div>
+          <div className="wall-stat wall-stat-v2g">
+            <span className="num wall-stat-value">
+              {(wall?.totalV2gMon ?? 0).toLocaleString('en-GB', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </span>
+            <span className="label">TOTAL V2G CASH · MON</span>
           </div>
         </aside>
       </div>

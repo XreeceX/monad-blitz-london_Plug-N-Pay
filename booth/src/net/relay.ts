@@ -85,7 +85,13 @@ export async function startSession(
 
 // ---- tick queue (§8): in-memory, cap 50, backoff 250ms/1s/4s, drop oldest ----
 
-interface Tick { t: number; kW: number; whDelta: number; taps: number }
+interface Tick {
+  t: number
+  kW: number
+  whDelta: number
+  taps: number
+  phase?: 'charge' | 'v2g'
+}
 
 const queue: Array<{ seq: number; tick: Tick }> = []
 let seq = 0
@@ -150,6 +156,8 @@ export async function endSession(payload: {
   whDischarged: number
   score: number
   tapCount: number
+  monPaid?: number
+  monEarned?: number
   roomId?: string
   deviceId?: string
   nickname?: string
@@ -180,6 +188,8 @@ export interface WallData {
   totalKW: number
   totalWh: number
   totalMon: number
+  /** Cumulative V2G sell-back earnings (MON) for the room — wall only. */
+  totalV2gMon: number
   count: number
   surgeAt?: number | null
 }
