@@ -50,7 +50,19 @@ npx tsx scripts/calibrate.ts
 Verifies the engine against the spec §5 table (7 taps/s → ~3,300, flip ≈36s;
 strictly increasing with tap rate; 30/s hard cap). Current worst deviation: 1.2%.
 
-## Deploy
+## Deploy (Render)
 
-`npm run build` → static files in `dist/`. Any static host works; point
-`VITE_API_BASE` at the game server if it isn't reverse-proxied under `/api`.
+`render.yaml` at the repo root deploys this as a Render **Static Site**:
+
+1. Render dashboard → **New → Blueprint** → select this repo → Apply.
+2. That's it — it builds `booth/` and publishes `dist/`, auto-deploying on
+   every push to `main`.
+3. Once the game server exists, uncomment `VITE_API_BASE` in `render.yaml`
+   (its Render URL + `/api`) and set `VITE_PUBLIC_URL` to the booth site's
+   own URL so the wall's QR encodes the public address. Redeploy.
+
+Until the server is live the deployed app runs in its designed offline mode:
+fully playable, leaderboard local to each device and labelled as such.
+
+Manual alternative: `npm run build` → static files in `dist/`; any static
+host works.
