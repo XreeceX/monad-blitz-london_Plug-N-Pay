@@ -78,6 +78,21 @@ app.get('/api/health', (_req, res) => {
   res.json({ ok: true, rooms: rooms.size })
 })
 
+// Public base URL for QR codes. On Render, RENDER_EXTERNAL_URL is set
+// automatically so phones join the deployed site, not localhost.
+app.get('/api/config', (_req, res) => {
+  const publicUrl = (
+    process.env.PUBLIC_URL ||
+    process.env.RENDER_EXTERNAL_URL ||
+    process.env.VITE_PUBLIC_URL ||
+    ''
+  ).replace(/\/$/, '')
+  res.json({
+    publicUrl: publicUrl || null,
+    serverNow: Date.now(),
+  })
+})
+
 app.post('/api/room', (_req, res) => {
   const id = freshRoomId()
   const hostToken = randomBytes(16).toString('hex')

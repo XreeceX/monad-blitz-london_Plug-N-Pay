@@ -51,16 +51,20 @@ npx tsx scripts/calibrate.ts
 Verifies the engine against the spec §5 table (7 taps/s → ~3,300, flip ≈36s;
 strictly increasing with tap rate; 30/s hard cap). Current worst deviation: 1.2%.
 
-## Deploy (Render)
+## Deploy (Render) — required for a room full of phones
 
-`render.yaml` deploys **one Node Web Service** that serves the SPA and the
-room-sync API (`server.mjs`):
+A QR that says `localhost` only works on your laptop. Deploy once, then **always
+host from the Render URL**.
 
-1. Render dashboard → **New → Blueprint** → select this repo → Apply.
-2. Wait for the build. Open the service URL — that is the live demo.
-3. Optional: set `VITE_PUBLIC_URL` to that URL in the Render env and rebuild
-   so host QR codes always encode the canonical address.
+1. [dashboard.render.com](https://dashboard.render.com) → **New → Blueprint**
+2. Connect `XreeceX/monad-blitz-london_Plug-N-Pay` → Apply `render.yaml`
+3. Wait for `plug-n-pay-booth` to go live
+4. Open **that** URL on the projector → **OPEN HOST LOBBY**
+5. Phones scan the QR (it uses Render’s `RENDER_EXTERNAL_URL` automatically)
 
-If you already have a Static Site from an earlier blueprint, delete it and
-re-apply the blueprint (or create a new Web Service with root `booth`,
-build `npm ci && npm run build`, start `npm start`).
+If you still have an old Static Site from an earlier setup, delete it — this
+demo needs the Node Web Service (`npm start`) so `/api/room` works.
+
+Same-Wi‑Fi fallback before Render is up: open
+`http://<your-lan-ip>:5174/` on the host laptop (not localhost), then the QR
+encodes the LAN address.

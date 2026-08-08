@@ -19,8 +19,8 @@ export function Landing({ onHost, hosting, error }: Props) {
           {hosting ? 'OPENING LOBBY…' : 'OPEN HOST LOBBY'}
         </button>
         <p className="landing-host-hint label">
-          Put this on the projector. Players join by scanning the QR. You start the round
-          when the room is ready.
+          Open this page from the Render URL (not localhost), put it on the projector,
+          share the QR, then start when the room is ready.
         </p>
         {error && <p className="landing-error">{error}</p>}
       </div>

@@ -75,11 +75,47 @@ export async function resetRoom(roomId: string, hostToken: string): Promise<Room
   })
 }
 
+let cachedPublicBase: string | undefined
+
+function pageBase(): string {
+  return `${window.location.origin}${window.location.pathname.replace(/\/$/, '')}`
+}
+
+/** Prefer the deployed public origin so the QR works for every phone. */
+export async function publicBaseUrl(): Promise<string> {
+  if (cachedPublicBase !== undefined) return cachedPublicBase
+
+  const fromEnv = (import.meta.env.VITE_PUBLIC_URL as string | undefined)?.replace(/\/$/, '')
+  if (fromEnv) {
+    cachedPublicBase = fromEnv
+    return fromEnv
+  }
+
+  // On Render, the server knows RENDER_EXTERNAL_URL even if the host opened a weird tab.
+  const cfg = await json<{ publicUrl: string | null }>('/config')
+  if (cfg?.publicUrl) {
+    cachedPublicBase = cfg.publicUrl
+    return cfg.publicUrl
+  }
+
+  // Last resort: whatever address this page was opened on.
+  // Opening via localhost makes a QR only you can scan — open the Render URL instead.
+  cachedPublicBase = pageBase()
+  return cachedPublicBase
+}
+
+export function isLoopbackUrl(url: string): boolean {
+  try {
+    const host = new URL(url).hostname
+    return host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host === '0.0.0.0'
+  } catch {
+    return false
+  }
+}
+
 /** Public join URL encoded into the host QR. */
-export function joinUrl(roomId: string): string {
-  const base =
-    (import.meta.env.VITE_PUBLIC_URL as string | undefined)?.replace(/\/$/, '') ??
-    `${window.location.origin}${window.location.pathname.replace(/\/$/, '')}`
+export async function joinUrl(roomId: string): Promise<string> {
+  const base = await publicBaseUrl()
   return `${base}/?room=${encodeURIComponent(roomId)}`
 }
 

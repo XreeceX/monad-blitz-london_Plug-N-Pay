@@ -49,6 +49,16 @@
   gap: 28px;
   overflow: auto;
 }
+
+.host-warn {
+  border: 1px solid var(--cyan-dim);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--surface);
+  line-height: 1.45;
+}
 .host-head {
   display: flex;
   justify-content: space-between;

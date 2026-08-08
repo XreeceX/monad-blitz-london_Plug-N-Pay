@@ -1,11 +1,14 @@
-# Render blueprint — one Web Service serves the SPA and the room-sync API.
-# Dashboard → New → Blueprint → pick this repo → Apply.
-# Auto-deploys on push to main.
+# Render blueprint — one Web Service serves the SPA + room-sync API.
+# Dashboard → New → Blueprint → select this repo → Apply.
+#
+# After deploy, open the service's public URL (e.g. https://plug-n-pay-booth.onrender.com)
+# and host from THERE. The QR uses RENDER_EXTERNAL_URL so phones can join from anywhere.
 
 services:
   - type: web
     name: plug-n-pay-booth
     runtime: node
+    plan: free
     rootDir: booth
     buildCommand: npm ci && npm run build
     startCommand: npm start
@@ -14,7 +17,3 @@ services:
     envVars:
       - key: NODE_VERSION
         value: '22'
-      # Optional once you know the public URL — makes the host QR encode
-      # the canonical address instead of whatever host opened the page.
-      # - key: VITE_PUBLIC_URL
-      #   value: https://plug-n-pay-booth.onrender.com

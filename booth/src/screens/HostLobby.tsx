@@ -1,8 +1,9 @@
 // Host screen for the presentation — QR up, watch joiners, start once.
+// The QR must encode the public Render URL, not localhost.
 
 import { useEffect, useRef, useState } from 'react'
 import QRCode from 'qrcode'
-import { getRoom, joinUrl, startRoom, type RoomState } from '../net/room'
+import { getRoom, isLoopbackUrl, joinUrl, startRoom, type RoomState } from '../net/room'
 
 interface Props {
   roomId: string
@@ -14,11 +15,24 @@ export function HostLobby({ roomId, hostToken, onBack }: Props) {
   const [room, setRoom] = useState<RoomState | null>(null)
   const [starting, setStarting] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const [url, setUrl] = useState<string>('')
+  const [loopback, setLoopback] = useState(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const url = joinUrl(roomId)
 
   useEffect(() => {
-    if (!canvasRef.current) return
+    let dead = false
+    void joinUrl(roomId).then((u) => {
+      if (dead) return
+      setUrl(u)
+      setLoopback(isLoopbackUrl(u))
+    })
+    return () => {
+      dead = true
+    }
+  }, [roomId])
+
+  useEffect(() => {
+    if (!canvasRef.current || !url) return
     void QRCode.toCanvas(canvasRef.current, url, {
       width: 280,
       margin: 2,
@@ -69,11 +83,19 @@ export function HostLobby({ roomId, hostToken, onBack }: Props) {
         </div>
       </header>
 
+      {loopback && (
+        <div className="host-warn">
+          This QR points at <span className="num">localhost</span> — other phones cannot open it.
+          Deploy on Render and open the host lobby from the Render URL (or, on the same Wi‑Fi,
+          open this page via your LAN address, e.g. <span className="num">http://192.168.x.x:5174</span>).
+        </div>
+      )}
+
       <div className="host-body">
         <div className="host-qr-panel">
           <canvas ref={canvasRef} />
           <p className="label">SCAN TO JOIN</p>
-          <p className="num host-url">{url.replace(/^https?:\/\//, '')}</p>
+          <p className="num host-url">{url ? url.replace(/^https?:\/\//, '') : '…'}</p>
         </div>
 
         <aside className="host-side">
@@ -106,7 +128,10 @@ export function HostLobby({ roomId, hostToken, onBack }: Props) {
                 <button
                   className="primary"
                   onClick={() => {
-                    window.open(`${window.location.pathname}?room=${roomId}#wall`, '_blank')
+                    if (!url) return
+                    const wall = new URL(url)
+                    wall.hash = 'wall'
+                    window.open(wall.toString(), '_blank')
                   }}
                 >
                   OPEN STANDINGS WALL
@@ -116,9 +141,15 @@ export function HostLobby({ roomId, hostToken, onBack }: Props) {
               <button
                 className="primary host-start"
                 onClick={() => void onStart()}
-                disabled={starting || count === 0}
+                disabled={starting || count === 0 || loopback}
               >
-                {starting ? 'STARTING…' : count === 0 ? 'WAITING FOR PLAYERS' : `START ROUND · ${count}`}
+                {loopback
+                  ? 'FIX URL FIRST'
+                  : starting
+                    ? 'STARTING…'
+                    : count === 0
+                      ? 'WAITING FOR PLAYERS'
+                      : `START ROUND · ${count}`}
               </button>
             )}
             {err && <p className="landing-error">{err}</p>}
