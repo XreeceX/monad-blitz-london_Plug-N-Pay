@@ -29,6 +29,8 @@ interface Props {
 }
 
 const RIPPLE_POOL = 8
+/** Bay floor grid pitch, px. The scroll wraps on this so the seam never shows. */
+const BAY_TILE = 72
 
 export function Charging({ car, session, onEnd }: Props) {
   const [phase, setPhase] = useState<'charge' | 'v2g'>('charge')
@@ -45,6 +47,8 @@ export function Charging({ car, session, onEnd }: Props) {
   const countdownRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
   const cablePathRef = useRef<SVGPathElement>(null)
+  const bayGridRef = useRef<HTMLDivElement>(null)
+  const bayGlowRef = useRef<HTMLDivElement>(null)
 
   const endedRef = useRef(false)
   const onEndRef = useRef(onEnd)
@@ -156,6 +160,7 @@ export function Charging({ car, session, onEnd }: Props) {
     let flipped = false
     let lastCountdown = -1
     let surgeOn = false
+    let bayScroll = 0
 
     const stop = onFrame((now, dtMs) => {
       if (endedRef.current) return
@@ -178,6 +183,19 @@ export function Charging({ car, session, onEnd }: Props) {
       if (kwRef.current) kwRef.current.textContent = `${Math.round(s.kW)} kW`
       if (barRef.current) barRef.current.style.transform = `scaleX(${Math.min(s.kwFrac, 1)})`
       if (fillRef.current) fillRef.current.style.transform = `scaleY(${s.soc})`
+
+      // The bay floor rushes at the delivery rate, and reverses on the Flip:
+      // the speed of the ground IS the power reading, read peripherally while
+      // both thumbs are busy. Two composited writes, no layout.
+      const frac = Math.min(s.kwFrac, 1)
+      const dir = s.phase === 'v2g' ? -1 : 1
+      bayScroll = (bayScroll + dir * dtMs * 0.001 * (70 + 420 * frac)) % BAY_TILE
+      if (bayGridRef.current) {
+        bayGridRef.current.style.transform = `translate3d(0, ${bayScroll.toFixed(1)}px, 0)`
+      }
+      if (bayGlowRef.current) {
+        bayGlowRef.current.style.opacity = (0.2 + 0.8 * frac).toFixed(2)
+      }
 
       // the stream is the input rendered as light
       stream.ratePerSec = 1.5 + 10 * Math.min(s.kwFrac, 1)
@@ -275,6 +293,16 @@ export function Charging({ car, session, onEnd }: Props) {
       </header>
 
       <div className="charging-stage hairline-top">
+        {/* The bay, in CSS 3D behind the car. Composited transforms only —
+            nothing here touches the tap path or the rAF budget. */}
+        <div className="bay3d" aria-hidden>
+          <div className="bay3d-plane">
+            <div ref={bayGridRef} className="bay3d-grid" />
+          </div>
+          <div ref={bayGlowRef} className="bay3d-glow" />
+          <div className="bay3d-horizon" />
+        </div>
+
         <svg ref={svgRef} className="charging-svg">
           <path ref={cablePathRef} className="cable" fill="none" stroke="var(--cyan-dim)" strokeWidth={4} strokeLinecap="round" />
           {Array.from({ length: 14 }, (_, i) => (

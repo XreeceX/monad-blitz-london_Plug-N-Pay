@@ -1,5 +1,7 @@
 // Frontpage for the presenter only. Players never type a code — they scan the QR.
 
+import { Hero3D } from '../components/Hero3D'
+
 interface Props {
   onHost: () => void
   hosting: boolean
@@ -10,6 +12,7 @@ export function Landing({ onHost, hosting, error }: Props) {
   return (
     <div className="screen landing">
       <div className="landing-glow" aria-hidden />
+      <Hero3D />
 
       <div className="landing-center">
         <p className="label landing-eyebrow">Booth host</p>

@@ -37,8 +37,7 @@
 /* ---------- landing / host / waiting ---------- */
 
 .landing {
-  padding: calc(env(safe-area-inset-top, 0px) + 24px) 24px
-    calc(env(safe-area-inset-bottom, 0px) + 28px);
+  padding: calc(env(safe-area-inset-top, 0px) + 24px) 24px 46vh;
   justify-content: center;
   align-items: center;
   gap: 0;
@@ -60,6 +59,165 @@
 @keyframes landing-breathe {
   0%, 100% { opacity: 0.75; transform: scale(1); }
   50% { opacity: 1; transform: scale(1.04); }
+}
+
+/* ---------- landing hero: CSS 3D charging bay ---------- */
+
+/* The frontpage is host-only — a laptop or a projector, never a phone in a
+   pocket. The scene owns the bottom of the frame and the copy sits above it. */
+.hero3d {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 42%;
+  bottom: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  perspective: 1150px;
+  perspective-origin: 50% 4%;
+  animation: hero-fade-in 900ms var(--ease) 120ms both;
+}
+
+@keyframes hero-fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+.hero3d-world {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transform: rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
+  transition: transform 500ms var(--ease);
+}
+
+/* The vanishing line, sitting where the floor plane runs out. */
+.hero3d-horizon {
+  position: absolute;
+  left: 50%;
+  top: 13%;
+  width: 120%;
+  height: 210px;
+  transform: translate(-50%, -50%);
+  background:
+    radial-gradient(ellipse 50% 42% at 50% 50%, rgba(10, 132, 255, 0.3), transparent 70%),
+    radial-gradient(ellipse 22% 16% at 50% 50%, rgba(160, 215, 255, 0.22), transparent 70%);
+  filter: blur(6px);
+}
+
+.hero3d-floor {
+  position: absolute;
+  bottom: 0;
+  left: -50%;
+  width: 200%;
+  height: 87%;
+  overflow: hidden;
+  transform-origin: 50% 100%;
+  transform: rotateX(68deg);
+  mask-image: linear-gradient(to top, #000 0%, #000 26%, transparent 82%);
+  -webkit-mask-image: linear-gradient(to top, #000 0%, #000 26%, transparent 82%);
+}
+
+/* Double height so the scroll can wrap by exactly one tile and never seam. */
+.hero3d-grid {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -100%;
+  height: 200%;
+  background-image:
+    repeating-linear-gradient(90deg, rgba(10, 132, 255, 0.5) 0 1px, transparent 1px 84px),
+    repeating-linear-gradient(0deg, rgba(10, 132, 255, 0.32) 0 1px, transparent 1px 84px);
+  animation: floor-flow 1.9s linear infinite;
+}
+
+@keyframes floor-flow {
+  from { transform: translateY(0); }
+  to { transform: translateY(84px); }
+}
+
+/* Light spill on the ground under the post. */
+.hero3d-pool {
+  position: absolute;
+  left: 30%;
+  top: 58%;
+  width: 44%;
+  height: 34%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(ellipse 50% 50% at 50% 50%, rgba(10, 132, 255, 0.22), transparent 70%);
+  filter: blur(10px);
+  animation: pool-breathe 3.4s ease-in-out infinite;
+}
+
+@keyframes pool-breathe {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+.hero3d-post {
+  position: absolute;
+  left: 25%;
+  top: 8%;
+  transform: translate(-50%, 0) translateZ(90px);
+  filter: drop-shadow(0 24px 32px rgba(0, 0, 0, 0.6));
+}
+
+.hero3d-post-led {
+  transform-origin: 30px 70px;
+  animation: post-led 2.6s ease-in-out infinite;
+}
+
+@keyframes post-led {
+  0%, 100% { opacity: 0.45; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.16); }
+}
+
+.hero3d-post-read { animation: post-led 1.7s ease-in-out infinite; }
+
+.hero3d-cable {
+  position: absolute;
+  left: 23%;
+  top: 20%;
+  width: 34%;
+  height: 46%;
+  transform: translateZ(70px);
+  overflow: visible;
+}
+
+.hero3d-cable-slack { opacity: 0.5; }
+
+/* Charge travelling post → car. Dash offset only — no path recompute. */
+.hero3d-cable-flow {
+  stroke-dasharray: 10 34;
+  filter: drop-shadow(0 0 6px var(--cyan));
+  animation: cable-flow 1.1s linear infinite;
+}
+
+@keyframes cable-flow {
+  from { stroke-dashoffset: 44; }
+  to { stroke-dashoffset: 0; }
+}
+
+/* Top-down art tipped onto the ground plane. 58deg, not the floor's 68deg —
+   a flatter car is the honest angle but an unreadable one. */
+.hero3d-car {
+  position: absolute;
+  left: 62%;
+  top: 22%;
+  transform-origin: 50% 100%;
+  transform: translate(-50%, 0) rotateX(58deg) scale(1.15);
+  filter: drop-shadow(0 30px 40px rgba(0, 0, 0, 0.72));
+  animation: car-hover 5.5s ease-in-out infinite;
+}
+
+@keyframes car-hover {
+  0%, 100% { transform: translate(-50%, 0) rotateX(58deg) scale(1.15); }
+  50% { transform: translate(-50%, -10px) rotateX(56deg) scale(1.16); }
+}
+
+@media (max-width: 800px) {
+  .hero3d { top: 56%; perspective: 800px; }
+  .hero3d-post { left: 20%; transform: translate(-50%, 0) translateZ(40px) scale(0.7); }
+  .hero3d-cable { left: 18%; width: 44%; }
+  .hero3d-car { left: 66%; animation: none; transform: translate(-50%, 0) rotateX(58deg) scale(0.78); }
 }
 
 .landing-center {
@@ -229,6 +387,7 @@
 .waiting-terms { font-size: 12px; max-width: 320px; margin: 8px 0 16px; }
 
 @media (max-width: 800px) {
+  .landing { padding-bottom: 40vh; }
   .host-lobby { padding: 24px 16px; }
   .host-body { grid-template-columns: 1fr; }
   .host-code { font-size: 36px; }
@@ -538,12 +697,17 @@
 }
 
 .hero-value {
-  font-size: 40px;
+  font-size: 44px;
   font-weight: 700;
   line-height: 1;
   letter-spacing: 0.4px;
   color: var(--text);
   will-change: contents;
+  /* Lifted off the bay rather than painted on it. */
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.28),
+    0 10px 26px rgba(0, 0, 0, 0.85),
+    0 0 34px rgba(10, 132, 255, 0.28);
 }
 
 .hero-label { color: var(--muted); font-size: 13px; font-weight: 600; text-transform: uppercase; }
@@ -568,7 +732,85 @@
   z-index: 1;
 }
 
-.charging-svg { flex: 1; width: 100%; min-height: 0; }
+/* Out of flow — the SVG keeps the whole flex line, and stage.clientHeight
+   (which the scene geometry is measured against) is unchanged.
+   The perspective lives HERE, not on the stage: `overflow: hidden` forces
+   transform-style back to flat, so an inherited 3D context would be lost. */
+.bay3d {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  perspective: 620px;
+  perspective-origin: 50% 4%;
+}
+
+.bay3d-plane {
+  position: absolute;
+  left: -60%;
+  right: -60%;
+  bottom: -10%;
+  height: 96%;
+  overflow: hidden;
+  transform-origin: 50% 100%;
+  transform: rotateX(72deg);
+  mask-image: linear-gradient(to top, #000 0%, #000 22%, transparent 84%);
+  -webkit-mask-image: linear-gradient(to top, #000 0%, #000 22%, transparent 84%);
+}
+
+/* Double height so a one-tile wrap is seamless; the loop writes translate3d. */
+.bay3d-grid {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -100%;
+  height: 200%;
+  will-change: transform;
+  background-image:
+    repeating-linear-gradient(90deg, rgba(10, 132, 255, 0.42) 0 1px, transparent 1px 72px),
+    repeating-linear-gradient(0deg, rgba(10, 132, 255, 0.26) 0 1px, transparent 1px 72px);
+}
+
+/* Brightness tracks kW — the loop writes opacity, nothing else. */
+.bay3d-glow {
+  position: absolute;
+  left: 50%;
+  bottom: -6%;
+  width: 130%;
+  height: 62%;
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse 46% 60% at 50% 100%, rgba(10, 132, 255, 0.34), transparent 72%);
+  opacity: 0.2;
+  filter: blur(8px);
+  will-change: opacity;
+}
+
+.bay3d-horizon {
+  position: absolute;
+  left: 50%;
+  top: 22%;
+  width: 116%;
+  height: 130px;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(ellipse 44% 40% at 50% 50%, rgba(10, 132, 255, 0.26), transparent 72%);
+  filter: blur(7px);
+}
+
+/* The car stays upright and untransformed on purpose. Its contents are
+   rewritten every frame by the rAF loop, and a 3D transform on this element
+   would force the whole layer to re-rasterise at a fractional angle 60 times a
+   second on a phone that is also tracking five fingers. Depth comes from the
+   bay plane behind it, which is a separate layer that only ever translates.
+   No filter or shadow here either: a drop-shadow would re-run over the whole
+   layer on every one of those content writes. */
+.charging-svg {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  position: relative;
+  z-index: 1;
+}
 
 .power-row {
   display: flex;
@@ -615,6 +857,7 @@
   z-index: 4;
   pointer-events: none;
   overflow: hidden;
+  perspective: 620px;
 }
 
 .tap-hint {
@@ -626,20 +869,41 @@
   color: var(--cyan-dim);
 }
 
+/* A shockwave lying in the bay, not a flat circle on glass: the ring is tipped
+   into the scene so a tap reads as energy hitting the ground. */
 .ripple {
   position: absolute;
-  width: 88px;
-  height: 88px;
-  margin: -44px 0 0 -44px;
+  width: 132px;
+  height: 132px;
+  margin: -66px 0 0 -66px;
   border: 2px solid var(--cyan);
   border-radius: 50%;
+  box-shadow: 0 0 18px rgba(10, 132, 255, 0.5), inset 0 0 22px rgba(10, 132, 255, 0.28);
   opacity: 0;
   pointer-events: none;
+  transform: rotateX(66deg) scale(0.18);
 }
-.ripple.rippling { animation: ripple-out 420ms ease-out 1; }
+
+/* Second ring, a beat behind — depth from parallax between the two. */
+.ripple::after {
+  content: '';
+  position: absolute;
+  inset: 18%;
+  border: 1.5px solid var(--cyan-hot);
+  border-radius: 50%;
+  opacity: 0.7;
+}
+
+.ripple.rippling { animation: ripple-out 520ms cubic-bezier(0.16, 1, 0.3, 1) 1; }
+.ripple.rippling::after { animation: ripple-inner 520ms cubic-bezier(0.16, 1, 0.3, 1) 1; }
+
 @keyframes ripple-out {
-  from { opacity: 0.75; transform: scale(0.2); }
-  to { opacity: 0; transform: scale(1.15); }
+  from { opacity: 0.85; transform: rotateX(66deg) scale(0.18); }
+  to { opacity: 0; transform: rotateX(66deg) scale(1.25); }
+}
+@keyframes ripple-inner {
+  from { opacity: 0.9; transform: scale(1.5); }
+  to { opacity: 0; transform: scale(0.55); }
 }
 
 /* surge (§3.5) — luminance, not a second hue (§10) */
