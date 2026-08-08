@@ -45,19 +45,44 @@ export function Garage({ car, nickname, onPlugged }: Props) {
     const h = rootEl.clientHeight
     svgEl.setAttribute('viewBox', `0 0 ${w} ${h}`)
 
-    // Scene geometry. Car top-centre; station and holster at the bottom.
-    const carScale = Math.min(1.1, (h * 0.42) / CAR_H)
+    // Scene geometry. The car fills the upper half inside a marked parking
+    // bay; the post stands bottom-left with the cable rising from its socket;
+    // the connector rests in a holster at bottom-centre, thumb-reachable.
+    const carScale = Math.min(1.35, (h * 0.52) / CAR_H)
     const carX = w / 2 - (CAR_W * carScale) / 2
-    const carY = h * 0.1
+    const carY = h * 0.06
     const localPort = carPortPoint(car)
     const port: Pt = { x: carX + localPort.x * carScale, y: carY + localPort.y * carScale }
-    const station: Pt = { x: w / 2, y: h - 8 }
-    const holster: Pt = { x: w / 2, y: h - 128 }
+
+    const postScale = 1.5
+    const postX = Math.max(w * 0.2, 56)
+    const postG = svgEl.querySelector<SVGGElement>('.garage-post')
+    postG?.setAttribute('transform', `translate(${postX}, ${h - 6}) scale(${postScale})`)
+    // the cable leaves the post's socket, not the screen edge
+    const station: Pt = { x: postX, y: h - 6 - 24 * postScale }
+    const holster: Pt = { x: w * 0.55, y: h - 150 }
 
     const carG = svgEl.querySelector<SVGGElement>('.garage-car')
     carG?.setAttribute('transform', `translate(${carX}, ${carY}) scale(${carScale})`)
-    const postG = svgEl.querySelector<SVGGElement>('.garage-post')
-    postG?.setAttribute('transform', `translate(${w / 2 - 92}, ${h - 4})`)
+
+    // parking bay brackets around the car — hairlines do the grouping (§10)
+    const bay = svgEl.querySelector<SVGPathElement>('.bay-lines')
+    if (bay) {
+      const bx = carX - 18
+      const by = carY - 12
+      const bw = CAR_W * carScale + 36
+      const bh = CAR_H * carScale + 24
+      const arm = 26
+      bay.setAttribute(
+        'd',
+        [
+          `M ${bx} ${by + arm} L ${bx} ${by} L ${bx + arm} ${by}`,
+          `M ${bx + bw - arm} ${by} L ${bx + bw} ${by} L ${bx + bw} ${by + arm}`,
+          `M ${bx} ${by + bh - arm} L ${bx} ${by + bh} L ${bx + arm} ${by + bh}`,
+          `M ${bx + bw - arm} ${by + bh} L ${bx + bw} ${by + bh} L ${bx + bw} ${by + bh - arm}`,
+        ].join(' '),
+      )
+    }
 
     // Mutable gesture state, all outside React.
     const pos = { ...holster }
@@ -232,6 +257,7 @@ export function Garage({ car, nickname, onPlugged }: Props) {
       </div>
 
       <svg ref={svgRef} className="garage-svg connector">
+        <path className="bay-lines" fill="none" stroke="var(--line)" strokeWidth={2} />
         <g className="garage-car">
           {/* Car nested inline so the port ring lives in the same coord space */}
           <Car spec={car} />
