@@ -28,7 +28,7 @@ export function Results({ car, deviceId, result, bestScore, onLeaderboard }: Pro
         )}
       </div>
 
-      <div className="results-grid hairline-top">
+      <div className="results-grid">
         <Counter value={fmtWh(result.whCharged)} unit="Wh" label="CHARGED" />
         <Counter value={fmtMon(result.monPaid)} unit="MON" label="PAID" />
       </div>
@@ -50,7 +50,7 @@ export function Results({ car, deviceId, result, bestScore, onLeaderboard }: Pro
 
       <div className="results-actions">
         <button className="primary" onClick={onLeaderboard}>
-          LEADERBOARD
+          Leaderboard
         </button>
       </div>
 

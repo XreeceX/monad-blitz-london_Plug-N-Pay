@@ -25,7 +25,7 @@ function JoinQr() {
     void QRCode.toCanvas(canvasRef.current, JOIN_URL, {
       width: 232,
       margin: 2,
-      color: { dark: '#06090C', light: '#DFE9ED' },
+      color: { dark: '#000000', light: '#FFFFFF' },
     })
   }, [])
   return (

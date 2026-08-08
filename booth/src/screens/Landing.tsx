@@ -10,13 +10,13 @@ export function Landing({ onHost, hosting, error }: Props) {
   return (
     <div className="screen landing">
       <div className="landing-brand">
-        <h1 className="landing-title">PLUG-N-PAY</h1>
-        <p className="landing-tag">Host screen · scan-to-join · one round</p>
+        <h1 className="landing-title">Plug-N-Pay</h1>
+        <p className="landing-tag">Host screen · scan to join · one round</p>
       </div>
 
       <div className="landing-actions">
         <button className="primary landing-host" onClick={onHost} disabled={hosting}>
-          {hosting ? 'OPENING LOBBY…' : 'OPEN HOST LOBBY'}
+          {hosting ? 'Opening Lobby…' : 'Open Host Lobby'}
         </button>
         <p className="landing-host-hint label">
           Open this page from the Render URL (not localhost), put it on the projector,

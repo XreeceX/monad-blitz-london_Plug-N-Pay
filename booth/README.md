@@ -1,8 +1,10 @@
 # Plug-N-Pay booth app (M8)
 
 The phone game and the public leaderboard screen. Design:
-`docs/specs/2026-08-08-booth-frontend-design.md`. System requirements:
-`docs/specs/REQUIREMENTS.md` (FR-BOOTH-*, FR-SPLIT-*).
+`docs/specs/2026-08-08-booth-frontend-design.md`. Visual system:
+[`DESIGN.md`](./DESIGN.md) (Apple Wallet / HIG tokens from
+[awesome-ios-design-md](https://github.com/Meliwat/awesome-ios-design-md)).
+System requirements: `docs/specs/REQUIREMENTS.md` (FR-BOOTH-*, FR-SPLIT-*).
 
 **This app makes zero chain calls and holds no key material (FR-SPLIT-1).**
 Everything a player sees is computed locally by the same engine rules, and it

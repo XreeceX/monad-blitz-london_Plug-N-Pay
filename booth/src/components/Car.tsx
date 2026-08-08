@@ -118,7 +118,7 @@ export function Car({ spec, fill, flourish = false, showPort = false }: Props) {
         <rect x={cx - 4} y={top + 2} width={8} height={len - 4} fill="#fff" opacity={0.14} clipPath={`url(#${bodyClip})`} />
       )}
 
-      <path d={cabin} fill="#0B1116" stroke="#1A252B" strokeWidth={1} />
+      <path d={cabin} fill="#1C1C1E" stroke="#262629" strokeWidth={1} />
 
       {/* headlights: switches, not fades (§3.2) */}
       <rect className="headlight" x={cx - noseW * 0.72} y={top + 3} width={14} height={5} rx={2} fill="#DFF6F8" />

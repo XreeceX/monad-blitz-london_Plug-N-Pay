@@ -36,7 +36,7 @@ export function HostLobby({ roomId, hostToken, onBack }: Props) {
     void QRCode.toCanvas(canvasRef.current, url, {
       width: 280,
       margin: 2,
-      color: { dark: '#06090C', light: '#DFE9ED' },
+      color: { dark: '#000000', light: '#FFFFFF' },
     })
   }, [url])
 
