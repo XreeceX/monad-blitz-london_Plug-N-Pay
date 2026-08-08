@@ -663,7 +663,7 @@ Blocking items live in `docs/idea/open_questions.md` and are not duplicated here
 | Booth player reward | 20% of any cash prize won, top 10, conditional on the team placing. Unconditional pot declined | Booth spec §7, table A |
 | FR-BOOTH-8 scope | Amended: soliciting votes stays banned; stating the payout's dependency on placement is now required | FR-BOOTH-8, FR-BOOTH-7 |
 | Contest reveal | Public screen live all day, sealed 10 s before close, winners revealed later in Discord | FR-BOOTH-10..12, booth spec §3.8 |
-| Booth cheat defence | Plausibility ceiling of 4,200 plus review before announcing. Server-side recompute stays P1 | FR-BOOTH-13, booth spec §6 |
+| Booth cheat defence | Engine caps effective tap rate at 30/s, above any human; runs averaging >18/s flagged for review before the reveal. **The 4,200 score ceiling recorded here earlier was dead on arrival — the curve's asymptote is 4,040.** Server-side recompute stays P1 | FR-BOOTH-13, booth spec §6 |
 
 Two further items originate in this document:
 
@@ -722,6 +722,26 @@ Run 2026-08-08 against `https://testnet-rpc.monad.xyz` with `tools/measure-rpc.m
 - **AC-5's ten concurrent sessions need 10 tx/s. That has roughly four times headroom and sits in the flat-latency band.** Per-tick settlement (FR-REL-1) is the right call at the rehearsed bar, and the reversal trigger above does not fire.
 - **The fifty-session stretch in NFR-P-2 is not achievable live.** 50 req/s is already past the knee for read calls, which are the cheap ones — writes add signature recovery, nonce ordering and mempool admission, so the write ceiling is strictly lower than 40. Run the stretch from a recording, or drop the claim. Attempting it live walks into RSK-1.
 - **CON-5 is closed.** The limit was undocumented; it is now measured. It was never published because it is enforced dynamically — refusals begin as a trickle (1.1% at 45 req/s) rather than a hard cutoff, so a naive test at a single rate would have missed it entirely.
+
+**RETRACTED 2026-08-08 — the write ceiling below was not real.** Kept because three decisions were made on it and the record should show why.
+
+A re-test at higher rates from the same wallet returned **25 tx/s: 75/75 clean · 40 tx/s: 109/120 · 60 tx/s: 180/180 clean**. A failure rate that does not rise with load is not a ceiling. The 40 tx/s losses were all `The request timed out` and the same wallet then ran 60 tx/s without a single failure.
+
+**What actually happened.** The original run showed 30/30 at 10 tx/s and 43/45 at 15, and a 4% loss was read as the onset of rate limiting. It was noise. The read measurement has the same defect: 3 refusals in 270 at 45 req/s and 4 in 300 at 50 were called a knee on the same reasoning. **Neither number should be quoted as a capacity limit.** What both runs do establish is that transient timeouts occur at a low single-digit rate at every load tested, so the relay needs retry, which it needed anyway.
+
+Contributing factor: the runs used the shared public key `0x…0001`, whose nonce moved from 20 to 89 between runs, so other people are actively transacting from it. Contention was never ruled out.
+
+**Consequences, stated plainly:**
+
+- **The zero-margin alarm was false.** Ten simulated sessions at 1 Hz is not at any ceiling.
+- **FR-REL-8's wallet pool is not supported by evidence.** A single wallet sustained 60 tx/s. The nonce-serialisation argument may still hold at some higher rate, but nothing here demonstrates it, and the pool should not be built on this measurement.
+- **§16's split does not depend on this.** It was justified partly by these numbers, and that part is void. It stands on the reasons that survive: the crowd path no longer depends on public infrastructure the team does not control, the demo cannot be taken down by someone else's traffic, and player count is unbounded. Those were the owner's reasons and they are unaffected. **It is 15:40 and the split is specced and agreed; reopening it on a corrected number would cost more than it could win.**
+
+**The measurement that would settle it** is still the one nobody has run: several *own* funded wallets, from the venue network, close to the pitch. Until then treat write capacity as *"at least 60 tx/s single-wallet, ceiling unknown, expect ~1-3% transient timeouts at any rate"*.
+
+---
+
+**Original run, retained for the record (do not quote as a limit).**
 
 **Write path, measured 2026-08-08 (provisional).** Run with `tools/measure-write-rpc.mjs` from a single wallet:
 
