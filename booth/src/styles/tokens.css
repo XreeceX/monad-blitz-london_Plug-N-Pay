@@ -1,0 +1,111 @@
+/* Design system — booth spec §10. Instrument panel, not a game skin.
+   One accent (cyan); power is luminance, never a second hue. */
+
+:root {
+  --ink:      #06090C;  /* page. Not #000 — pure black kills depth */
+  --surface:  #0C1216;
+  --line:     #1A252B;  /* hairlines do the grouping; cards are avoided */
+  --cyan:     #33D6E0;  /* the only accent */
+  --cyan-dim: #17727A;  /* low draw, inactive, axis labels */
+  --cyan-hot: #A8F4F8;  /* peak draw only. Never a glow, only a lightness */
+  --text:     #DFE9ED;
+  --muted:    #6E828A;
+  --monad:    #6E54FF;  /* attribution only */
+  --radius:   4px;
+  --space:    8px;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* Inverted, for the V2G phase only (§10: the Flip inverts, it does not recolour). */
+[data-phase='v2g'] {
+  --ink:      #33D6E0;
+  --surface:  #2AC3CD;
+  --line:     #0C1216;
+  --cyan:     #06090C;
+  --cyan-dim: #0C4A50;
+  --cyan-hot: #06090C;
+  --text:     #06090C;
+  --muted:    #0C4A50;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  overscroll-behavior: none;   /* kills pull-to-refresh mid-game */
+  height: 100%;
+  background: var(--ink);
+}
+
+body {
+  color: var(--text);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 15px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root { height: 100%; }
+
+/* Platform rules — §11. All four properties required. */
+.tap-zone, button, .connector, .no-touch-ui {
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.num {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+button {
+  font: inherit;
+  color: var(--text);
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px 20px;
+  cursor: pointer;
+}
+
+button.primary {
+  border-color: var(--cyan);
+  color: var(--cyan);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.hairline-top { border-top: 1px solid var(--line); }
+
+.label {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* The permanent honesty label — FR-SPLIT-5. Never removed, never hidden. */
+.sim-label {
+  position: fixed;
+  top: env(safe-area-inset-top, 0px);
+  left: 0;
+  right: 0;
+  text-align: center;
+  padding: 4px 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  z-index: 100;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
