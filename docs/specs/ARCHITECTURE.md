@@ -1539,23 +1539,67 @@ T-2h, **do not fall back to one wallet — fall back to fewer sessions.** One wa
 per-tick are incompatible; ASM-1 says so directly ("Falling back to a single relay wallet
 means falling back to batching... the two are the same decision", `REQUIREMENTS.md:149`).
 
-### ADR-3 · `eth_sendRawTransactionSync` for every settlement
+### ADR-3 · Async on the rail, sync on the bridge — **REVERSED 2026-08-08**
 
-**Decision.** Every settlement uses the sync method with an explicit `timeout_ms`. No
-separate receipt poll exists anywhere in the codebase.
+> 🔴 **`relay-eng`, `contract-eng`: this reverses what an earlier copy of this document
+> said.** If you read "sync for every settlement" here before ~15:30, that guidance was
+> withdrawn and then briefly lost to a concurrent checkout. **Do not put a synchronous
+> send on the per-tick path.**
 
-**Why.** It halves-to-quarters the RPC cost per tick (§11 C11): 10 req/s instead of
-20–40 at the 10 tx/s budget. It is the difference between 4× headroom and sitting on the
-measured knee.
+**Decision.** Transport is chosen per *call site*, not globally:
 
-**Cost.** A hard dependency on a Monad-specific RPC extension. The relay's submission
-path blocks per wallet for the full inclusion time, which is what sets the 600 ms
-occupancy in §5.2 and therefore the pool size.
+| Path | Method | Why |
+|---|---|---|
+| **Rail, per-tick `settle()` (M5)** | **async `eth_sendRawTransaction` + retry-backed receipt poll** | A sync send blocks until inclusion, which **serialises exactly the thing the rail needs concurrent** |
+| **Closing `settleRoomAggregate` (ADR-9)** | **sync `eth_sendRawTransactionSync`** | One call, once, at the moment the presenter needs a hash on screen *inside a sentence*. One round trip instead of submit-then-poll |
 
-**Reversal trigger.** If W0 finds the method unavailable or unreliable on
-`https://testnet-rpc.monad.xyz`, fall back to `eth_sendRawTransaction` plus a receipt
-poll **and halve the settlement rate to 5 tx/s in the same change.** The rate cut is not
-optional — the fallback costs 2–4× the RPC per tick.
+**The method is VERIFIED to exist** on `https://testnet-rpc.monad.xyz` — no longer an
+assumption. Probed with a **negative control**, which is what makes the result
+trustworthy:
+
+```
+eth_blockNumber             → result present           control: a method that EXISTS
+eth_thisMethodDoesNotExist  → -32601 Method not found   control: a method that DOESN'T
+eth_sendRawTransactionSync  → code 5 "The transaction is not ready to be processed"
+eth_sendRawTransaction      → -32603 Transaction decoding error
+```
+
+A **domain error rather than −32601** is something only an implemented method returns.
+And it takes a *different* error path from the async variant on the same garbage payload,
+so it is a **distinct implementation, not an alias**.
+
+**Why the original decision was backwards.** ADR-3 first put sync on the per-tick path to
+save an RPC call, when the RPC budget was believed to be the binding constraint. Two
+things killed that reasoning:
+
+1. **The budget constraint evaporated** — both ceilings retracted (§16.10). Saving a call
+   per tick buys nothing against no observed limit.
+2. **Blocking is the real cost, and it lands on the wrong path.** A sync send holds the
+   submitting wallet until inclusion. On a path that wants ten concurrent settlements per
+   second, that is a self-inflicted serialisation.
+
+**This is §16.8's error seen from the other side, and the connection is worth keeping.**
+The 600 ms occupancy model was **correct for a sync send** — sync really does hold a
+wallet for the full inclusion time. The mistake was treating that as a property of *the
+rail* rather than of *the method ADR-3 had chosen for it*. The model was not wrong about
+physics; **it was measuring the cost of ADR-3's own mistake.** Choosing async removes the
+serialisation the model described, which is why §16.8's re-derivation and this reversal
+are one correction wearing two hats.
+
+**Cost.** Async settle needs retry and a receipt path. **Retry is already the primary
+mitigation** from the retraction (§16.10) — transient timeouts appear at every load — so
+this costs nothing new. The one-call-per-tick budget claim that used to live here has been
+removed: it argued for a constraint that no longer exists.
+
+**Implementation note that will otherwise be got wrong:** on receipt timeout, **re-poll
+the same hash — never re-send.** The transaction may already be included, and a re-send
+burns the next nonce for nothing.
+
+**Reversal trigger.** Put sync back on the rail only if async submission is shown to lose
+transactions in a way retry cannot recover — and check the **shape** first (§16.10),
+because a flat single-digit timeout rate is a reason to retry, not to change transport.
+For the bridge, keeping the async fallback costs nothing: it is one call, so
+submit-then-poll is an acceptable degradation if sync misbehaves on the day.
 
 ### ADR-4 · Signature verification off-chain, in the relay
 
@@ -1645,6 +1689,31 @@ ceiling"; that ceiling was retracted and the argument only got stronger.)*
 aggregate minted at T-10min. If the live send stalls past five seconds the rehearsal hash
 is shown **and named as the rehearsal one** — a fallback artefact that must never be
 passed off as live (NFR-R-3).
+
+#### ⚠ The one place IF-4 does not apply — say this before anyone finds it
+
+`settleRoomAggregate(roundId, totalWhMwh, totalMonWei)` takes **`totalMonWei` directly
+from the game server** (API.md §1.2). Everywhere else, IF-4 forbids exactly that: *"the
+M4 contract, not the relay, MUST perform `whDelta × price` on-chain… never a
+relay-submitted MON amount"* (`REQUIREMENTS.md:492`). This is the single call in the
+system where a caller dictates a MON figure.
+
+**It is defensible, and a reviewer who has read IF-4 will find it in about ten seconds.**
+So it gets volunteered rather than discovered. **Required wording for the README and the
+pitch — copy verbatim:**
+
+> The room aggregate is the one transaction where the amount comes from off-chain rather
+> than being computed on-chain. That is deliberate: the crowd's energy is **simulated**,
+> so there is no metered obligation to protect and nothing for IF-4's rule to defend. The
+> rule exists to stop a relay inventing what a payer owes — and on the rail, where real
+> value moves against signed metering, **the contract still computes every MON amount
+> itself and always will.** The aggregate settles a number the room generated in a game;
+> the rail settles a number a meter signed.
+
+**The distinction that makes it honest:** IF-4 protects *metered obligations*. The
+aggregate is a **display settlement of simulated energy**, not an obligation anyone
+incurred. Applying IF-4 there would be ceremony without protection — but dropping it
+silently would look like the rule being bent at the climax, which is worse than either.
 
 **Rejected alternatives** (`REQUIREMENTS.md:811`): an offline queue settling after the
 pitch is invisible at the moment people vote, and "it'll settle later" is the sound of an
@@ -1930,6 +1999,23 @@ checking whether it *rose* with load. It did not. Both runs also used the shared
 key `0x…0001`, whose nonce moved **20 → 89 between runs** — strangers were actively
 transacting from it, and contention was never ruled out.
 
+> ### Measure the shape, not the point
+>
+> The lesson is not "measure more" — more runs at the same rate would have produced the
+> same wrong answer with tighter error bars. **The tell was already inside the data.**
+> Sixty clean while forty failed is non-monotonic, and non-monotonicity is checkable in
+> the same run that produces the number, at zero extra cost. Nobody asked *"does this
+> rise with load?"* — and that one question is the whole difference between a capacity
+> limit and a noise floor.
+>
+> The read table carried the same signature and **it was quoted in this document without
+> anyone noticing**: 10 refusals at 60 req/s, then **4 at 70**. A ceiling does not get
+> better as you push harder.
+>
+> **Applies to every measurement this project makes.** A number at one operating point is
+> a data point; a monotonic trend across several is a limit. **Only the second is
+> quotable on stage.**
+
 ### The corrected numbers
 
 > **Write capacity: at least 60 tx/s single-wallet. Ceiling unknown. Expect ~1–3%
@@ -2008,7 +2094,7 @@ honest account of what "ready for people to use" does and does not mean here.
 
 | Process | Runs on | Why there | Public? |
 |---|---|---|---|
-| **`relay`** (M1–M6, M9) | **Render** — decided 2026-08-08 | **Must not have a function-duration cap.** FD-3/ADR-5 puts SSE on this hop, and a serverless platform that kills connections at 300 s would break FR-DASH-8 mid-pitch. That property is the whole basis of the choice. Render is **already chosen for the game server**, so using it for both removes a moving part rather than adding one. Railway, Fly.io or a plain VPS satisfy the same constraint if Render fails | Yes — the wall and game server reach it |
+| **`relay`** (M1–M6, M9) | **One Node process on `:8787`, exposed by a `cloudflared` quick tunnel** — decided 2026-08-08. **Render is ruled out by the user; no Vercel either** | **Must not have a function-duration cap.** FD-3/ADR-5 puts SSE on this hop, and any platform that kills connections at 300 s would break FR-DASH-8 mid-pitch. A plain long-lived Node process has no such cap by construction, which satisfies the constraint more directly than any PaaS. **The same process serves the HTTP API, the SSE stream and the built frontend**, so there is one origin, no CORS, and one thing to restart | Yes — via the tunnel URL |
 | **`wall`** (M7) | Static build; **served from the relay host**, or run from `file://` on the presenting laptop | Same-origin with the relay removes CORS and one failure mode. Running it locally is the more robust choice on venue wifi and is the recommended default | No — projector only |
 | **`ops`** (M9 surface) | Same origin as the wall | Shared-secret header; physical laptop control is the security model (TB-4) | No |
 | **`booth-app`** (M8) | **Vercel**, per its own spec | Static React build; the 300 s cap is irrelevant because ADR-5 already puts this hop on polling | **Yes — QR code** |
@@ -2154,7 +2240,9 @@ Ordered. Each row is checkable by someone other than the person who built it.
 |---|---|---|---|
 | **1** | 🔴 **Probe `eth_sendRawTransactionSync`** against `testnet-rpc.monad.xyz`. Two minutes, one curl. **ADR-3 assumes it exists and it has never been called** — the write runs used async `eth_sendRawTransaction`. This is now the top unknown, the RPC-ceiling one having been retracted | **T-4h, first** | §16.9 |
 | 2 | Faucet's real per-address amount and interval established (replaces the UNVERIFIED note) | T-4h | ASM-1 |
-| 3 | **One wallet** funded **above the 10 MON reserve floor** — reads ≥12 MON. One faucet claim; no pool, no consolidation (§16.10) | T-3h | §5.3, §16.10 |
+| 3 | **MON split, decided 2026-08-08: ~1 MON across payer deposits, ~4 MON for gas.** `deposit(payer)` locks MON in the contract, so session reserves and gas compete for the same 5 MON. Revisit when more MON lands | T-3h | §17.8, FR-SET-8 |
+| 3a | **Replace the 0.015 MON/tx estimate with a measured figure from the first real `settle`** — read `gasUsed × effectiveGasPrice` off the receipt. The estimate is a **guess** and must not reach the runbook | at first settle | §6.3 |
+| 3b | **One wallet** funded **above the 10 MON reserve floor** if MON allows — otherwise accept the throttle and say so. No pool, no consolidation (§16.10) | T-3h | §5.3 |
 | 3b | *Optional, only with spare time:* multi-wallet throughput comparison from the **venue network** with **own** funded keys. Settles FR-REL-8 either way. **Not a gate** — a single wallet has run 60 tx/s clean | — | §16.10 |
 | 4 | Funding transfers **≥3 blocks old**; readiness proven by a **successful test transaction**, never a balance read | T-2h30 | §5.5.1 |
 | 5 | Identity pool of 60 registered and confirmed | T-2h30 | FR-SIM-6 |
@@ -2171,6 +2259,45 @@ Ordered. Each row is checkable by someone other than the person who built it.
 **Rows 1 and 12 are the two that must not slip.** Row 1 because every capacity claim in
 this document depends on it; row 12 because it is the only thing that survives total
 infrastructure failure, and it is always the first casualty of a build running late.
+
+### 17.8 The MON budget — 5 MON, and what it actually buys
+
+**Decided 2026-08-08: ~1 MON across payer deposits, ~4 MON for gas.** Deployer
+`0x588A350b9f7d49F8EffC498892359eAf06D238Be`, chain 10143 confirmed live.
+
+The two compete, which is not obvious from the requirements: `deposit(payer)` is
+`payable` and **locks MON inside the contract** as the FR-SET-8 reserve, so every MON
+deposited is a MON not available for gas.
+
+```
+gas budget            4 MON
+per settle (GUESS)    0.015 MON        ← §6.3, unsourced. REPLACE WITH A MEASURED FIGURE
+                      ─────────────
+settlements affordable ≈ 260
+```
+
+**What that buys, and it is tighter than it looks:**
+
+| Run | Settlements | Cumulative |
+|---|---|---|
+| One 60 s run at n=10, 1 Hz | **600** | already over budget |
+| One 60 s run at n=2, 1 Hz | 120 | 120 |
+| A second n=2 rehearsal | 120 | 240 — **at the limit** |
+
+**Therefore: rehearse at n=2, run n=10 once, live.** A single full-scale rehearsal costs
+more than the entire gas budget. This is a real constraint on the rehearsal plan, not a
+rounding note, and it lands before anyone burns the budget discovering it.
+
+**The 0.015 figure is a guess** (§6.3, `monad-facts.md` Q6 A4 — explicitly unsourced).
+The first real `settle` receipt gives the true number as
+`gasUsed × effectiveGasPrice`; **substitute it and redo this table before relying on
+it.** If the real cost is 0.005, the budget triples and an n=10 rehearsal becomes
+affordable; if it is 0.05, even n=2 is tight.
+
+**Reserve-floor interaction:** 5 MON is below the 10 MON floor
+(`.agents/skills/concepts/references/reserve-balance.md:3`), so the deployer may be
+throttled to ~1 tx/1.2 s. `scaffold`'s empirical probe settles whether that bites. **If
+it does, the honest response is a lower session count, stated out loud** — not a workaround.
 
 ### 17.7 Residual risk after the split
 

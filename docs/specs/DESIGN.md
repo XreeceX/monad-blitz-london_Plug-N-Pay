@@ -105,7 +105,9 @@ export const CFG = {
   GAS_SET_RATE:         90_000,            // (guess)
 
   // ── timing ─────────────────────────────────────────────────────────────
-  SEND_TIMEOUT_MS:     2000,               // eth_sendRawTransactionSync timeout_ms
+  RECEIPT_TIMEOUT_MS:  2000,               // rail: async receipt poll (ADR-3)
+  BRIDGE_SYNC_TIMEOUT_MS: 5000,            // bridge only: sync timeout_ms, matches
+                                           //   FR-SPLIT-8's 5 s stall rule
   SESSION_IDLE_MS:     5000,               // FR-SET-4 close threshold
   SSE_HEARTBEAT_MS:    1000,               // wall liveness detector
 
@@ -121,7 +123,12 @@ export const CFG = {
   //   chain-writes violates that requirement BY EXISTING — inspection would find a
   //   code path that puts wallets in a phone app. Booth-on-chain is out of scope;
   //   REQUIREMENTS.md §16 is the reason. See PART II.
-  USE_SYNC_SEND:       true,               // ADR-3 — UNVERIFIED, see PART II §M-ADR3
+  // NO USE_SYNC_SEND FLAG. Transport is per CALL SITE, not global (ADR-3):
+  //   rail   settle()             -> async eth_sendRawTransaction + retry
+  //   bridge settleRoomAggregate  -> sync  eth_sendRawTransactionSync
+  // The sync method is VERIFIED present on testnet-rpc.monad.xyz (§M-ADR3).
+  // A sync send BLOCKS until inclusion — putting it on the rail would serialise
+  // the one path that must stay concurrent.
 };
 ```
 
@@ -241,21 +248,43 @@ runtime defence.
 
 On-chain, in `PlugNPay.sol`:
 
+> **Corrected 2026-08-08 to match API.md §1.2 — the `pubKey` field is gone, and it was
+> redundant.** API.md registers by wallet address: `registerIdentity(address wallet, Role
+> role)`.
+
 ```solidity
 enum Role { NONE, VEHICLE, STATION, METER, AGGREGATOR }   // NONE = unregistered
 
 struct Identity {
-    address wallet;    // 20 bytes  ┐ one slot
-    Role    role;      //  1 byte   │
-    bool    active;    //  1 byte   ┘
-    bytes32 pubKey;    // 32 bytes  — second slot
+    Role role;         //  1 byte   ┐ one slot, keyed by address
+    bool active;       //  1 byte   ┘
 }
-mapping(bytes32 => Identity) public registry;             // keccak256(idString) => Identity
+mapping(address => Identity) public registry;             // wallet => Identity
 ```
 
-Two slots per identity, packed so `wallet`, `role` and `active` share one
-(`ARCHITECTURE.md` §6.3 — cold storage is 8,100 gas against warm 100, so slot count is
-the gas cost).
+**Why no `pubKey`: on secp256k1 the Ethereum address *is* the public key's identity.**
+Verification is `ecrecover(digest, signature) == registeredMeterWallet` — recovering the
+signer and comparing addresses. Storing a separate `pubKey` would be a second copy of the
+same fact, costing a cold storage slot (8,100 gas, `.agents/skills/gas/SKILL.md:116`) to
+hold information the signature already carries.
+
+#### 🔴 Mandatory E2E assertion — otherwise IF-1 is only half-wired
+
+**The relay MUST verify against the address recovered from the signature, not against a
+public key read from configuration.**
+
+```js
+const signer = secp256k1.recover(digest, r.signature);   // an ADDRESS
+if (signer !== registry.walletFor(r.meterId)) return REJECT('bad-signature');
+//               ▲ from the CHAIN registry, never from a local config file
+```
+
+If a config-file key is used instead, the check still *passes* for well-formed readings
+and the system looks correct from outside — but the on-chain registry has stopped being
+the authority, and **FR-ID-3, IF-1 and NFR-S-2 are silently unenforced**. Nothing
+observable fails. That is why it is an explicit E2E assertion (plan step 1) rather than a
+code-review note: it is precisely the kind of hole that survives review and cannot be
+seen from the outside.
 
 ### M1.5 Runtime registration (FR-ID-6, `S`)
 
@@ -736,20 +765,47 @@ to reach for — would violate it.
 
 ### M4.7 Deployment and verification (NFR-M-2, AC-9, CON-2)
 
-Per `.agents/skills/scaffold/SKILL.md:97`: **always use the verification API**, which
-verifies on MonadVision, Socialscan and Monadscan in one call. Do **not** reach for
-`forge verify-contract` first.
+> **Corrected 2026-08-08: there is no Foundry on this machine.** The build compiles with
+> **`solc-js`** and deploys with **`viem`** (`package.json`: `solc ^0.8.36`,
+> `viem ^2.55.11`). Every `forge` command below is replaced.
 
-```bash
-forge script script/Deploy.s.sol --rpc-url https://testnet-rpc.monad.xyz --broadcast
-forge verify-contract <ADDR> PlugNPay --chain 10143 --show-standard-json-input \
-  > /tmp/standard-input.json
-# POST chainId=10143, contractAddress, contractName, compilerVersion,
-#      standardJsonInput, foundryMetadata  →  https://agents.devnads.com/v1/verify
+**Compile and deploy — `scripts/deploy.mjs`:**
+
+```js
+import solc from 'solc';
+import { createWalletClient, http } from 'viem';
+
+// 1. Compile. KEEP the standard JSON input — verification needs the exact object.
+const input = { language: 'Solidity',
+  sources: { 'PlugNPay.sol': { content: src } },
+  settings: { optimizer: { enabled: true, runs: 200 },
+              outputSelection: { '*': { '*': ['abi','evm.bytecode.object','metadata'] } } } };
+const out = JSON.parse(solc.compile(JSON.stringify(input)));
+
+// 2. Deploy to chain 10143 with an explicit gas limit — NEVER eth_estimateGas (G3/G4).
+const hash = await wallet.deployContract({ abi, bytecode, gas: 3_000_000n });
+
+// 3. Write deployments/10143.json — address, abi, blockNumber, the standard JSON
+//    input, and the solc version. Verification and the relay both read this file.
 ```
-(`.agents/skills/scaffold/SKILL.md:105-161`.) Fallback only if the API fails:
-`--verifier sourcify --verifier-url "https://sourcify-api-monad.blockvision.org/"`
-(`.agents/skills/scaffold/SKILL.md:169-172`).
+
+**Verify** via the same API the scaffold skill mandates — it covers MonadVision,
+Socialscan and Monadscan in one call (`.agents/skills/scaffold/SKILL.md:97`). The API
+takes a **standard JSON input**, which `solc-js` produces natively; Foundry was only ever
+one way to generate it:
+
+```
+POST https://agents.devnads.com/v1/verify
+  { chainId: 10143, contractAddress, contractName: "PlugNPay.sol:PlugNPay",
+    compilerVersion, standardJsonInput }        # foundryMetadata omitted — no Foundry
+```
+
+**Keep the exact compiler input and version that produced the deployed bytecode.**
+Recompiling with different settings yields different bytecode and verification fails with
+no useful error — the most common way NFR-M-2 and AC-9 get missed.
+
+**AC-9 is met when a stranger can open the address on `https://testnet.monadvision.com`
+and read the source.** Check it from a logged-out browser once, before freeze.
 
 **Never invent an address.** Any external address must be verified to have code via
 `cast code <addr> --rpc-url https://testnet-rpc.monad.xyz`
@@ -903,9 +959,11 @@ async function submit(entry, wallet) {
   };
   const raw = await wallet.signer.sign(tx);
 
-  const receipt = CFG.USE_SYNC_SEND
-    ? await rpc.call('eth_sendRawTransactionSync', [raw, { timeout_ms: CFG.SEND_TIMEOUT_MS }])
-    : await sendAndPoll(raw);                     // ADR-3 reversal: ALSO halve TX_BUDGET
+  // ASYNC on the rail — ADR-3, REVERSED. eth_sendRawTransactionSync BLOCKS until
+  // inclusion, which would serialise the one path that must stay concurrent.
+  // Sync is reserved for the closing settleRoomAggregate (one call, one moment).
+  const txHash  = await rpc.call('eth_sendRawTransaction', [raw]);
+  const receipt = await awaitReceipt(txHash, CFG.RECEIPT_TIMEOUT_MS);   // retry-backed
 
   pool.release(wallet, { ok: receipt?.status === '0x1' });
   if (receipt?.status === '0x1') feed.publish(settledEvent(entry, receipt));  // ADR-7
@@ -913,8 +971,15 @@ async function submit(entry, wallet) {
 }
 ```
 
-One RPC call per settled tick. The arithmetic for why this is mandatory rather than
-merely nice is in `ARCHITECTURE.md` §11 C11.
+**Two calls per settled tick, and that is fine.** The one-call-per-tick argument was an
+optimisation against an RPC ceiling that has since been **retracted** (§M-RETRACTION);
+one wallet ran 60 tx/s clean, so ten sessions at two calls each is nowhere near anything
+observed.
+
+**`awaitReceipt` must retry** — transient timeouts appeared at every load tested
+(`REQUIREMENTS.md:730`), which makes retry the one durable finding of the whole RPC
+exercise rather than a nicety. **On timeout, re-poll the same hash; never re-send.** The
+transaction may already be included, and a re-send burns the next nonce for nothing.
 
 ### M5.5 Degraded-mode state machine (FR-REL-4, FR-REL-5, UC-8, AC-8)
 
@@ -1855,10 +1920,37 @@ thing the booth needs, and it is smaller than the relay integration it replaces.
 
 ## Three corrections that apply across the whole document
 
-### §M-ISFINAL · `settle()` has no `isFinal` parameter — answering `api-author`
+### §M-ISFINAL · `settle()` **does** take `isFinal` — aligned to API.md, 2026-08-08
 
-**No parameter. FR-SET-5 is satisfied by the close path costing nothing, not by folding
-the close into a settlement.**
+> **This section originally argued for no parameter. API.md §1.2 wins, and its design is
+> better than mine.** `settle(bytes32 sessionId, uint256 seq, int256 whDelta, bool
+> isFinal)` is what `contract-eng` is building. Recorded as a correction rather than
+> deleted, because the comparison is the useful part.
+>
+> **Why API.md's version is better:** with `isFinal`, a normal session close costs
+> **zero extra transactions** — the last tick carries the close. My version spent one
+> `closeSession` transaction. That transaction moved no value, so FR-SET-5 held, but
+> "requires no *reconciliation* transaction" is a weaker claim than "requires no
+> transaction at all." Fewer transactions is strictly better on a path where every
+> transaction costs gas from a 4 MON budget (`ARCHITECTURE.md` §17.8).
+>
+> **One thing in API.md's rationale needs rebasing:** it justifies `isFinal` with FR-SET-5
+> **and FR-BOOTH-16**. FR-BOOTH-16 is **withdrawn** (`REQUIREMENTS.md:439`). The
+> justification stands on **FR-SET-5 alone**, and should be stated that way so nobody
+> later "cleans up" a parameter whose only cited basis has been struck out.
+
+**How the two close paths divide:**
+
+| Case | Path | Transactions |
+|---|---|---|
+| Normal end — a final tick exists | `settle(..., isFinal: true)` | **0 extra** |
+| FR-SET-4 timeout — readings simply stopped, no final tick to carry the flag | `closeSession(sessionId)` | 1, moving **no value** |
+
+`closeSession()` still exists and still never calls `_move` (§M4.5) — it is the edge case,
+not the normal path. **FR-SET-5 is satisfied twice over:** the normal path spends nothing,
+and the edge path transfers nothing.
+
+**The argument my version rested on, retained because it is still true of `closeSession`:**
 
 FR-BOOTH-16 (which *did* require the final settlement to double as the close) is
 **withdrawn** (`REQUIREMENTS.md:439`), so that obligation is gone. What remains is
@@ -1904,16 +1996,54 @@ single-accent palette does not obviously provide. **Confirm against the booth se
 token file before building M7.** Flagged rather than guessed; I do not own
 `2026-08-08-booth-frontend-design.md`.
 
-### §M-ADR3 · `eth_sendRawTransactionSync` is UNVERIFIED
+### §M-ADR3 · `eth_sendRawTransactionSync` — **VERIFIED, and ADR-3 reversed**
 
-`CFG.USE_SYNC_SEND: true` rests on documentation only
-(https://docs.monad.xyz/reference/json-rpc/api, fetched 2026-08-08). **It has never been
-called against `testnet-rpc.monad.xyz`.** The write measurement in `REQUIREMENTS.md`
-§13.4 used viem's standard `sendTransaction` — i.e. **async `eth_sendRawTransaction`**,
-not the sync variant.
+**The method exists** on `https://testnet-rpc.monad.xyz`. Probed with a negative control:
 
-So the measured 10 tx/s figure is for the *async* path, and §M5.4's one-RPC-call-per-tick
-claim is unproven on this endpoint.
+| Call | Response | Meaning |
+|---|---|---|
+| `eth_blockNumber` | result present | control — a method that exists |
+| `eth_thisMethodDoesNotExist` | `-32601 Method not found` | control — a method that does not |
+| **`eth_sendRawTransactionSync`** | **code 5, "The transaction is not ready to be processed"** | a **domain** error → implemented |
+| `eth_sendRawTransaction` | `-32603 Transaction decoding error` | *different* error path → distinct implementation, not an alias |
+
+**But ADR-3 was backwards, and the fix is not to use it on the rail.** A sync send blocks
+until inclusion, serialising the one path that must stay concurrent:
+
+| Path | Method | Timeout const |
+|---|---|---|
+| **Rail `settle()` (§M5.4)** | async `eth_sendRawTransaction` + retry-backed receipt poll | `RECEIPT_TIMEOUT_MS` |
+| **Bridge `settleRoomAggregate`** | **sync** — one call, one round trip, hash on screen inside a sentence | `BRIDGE_SYNC_TIMEOUT_MS` (5 s, FR-SPLIT-8) |
+
+`USE_SYNC_SEND` is **deleted** — transport is a property of the call site, not a global
+switch.
+
+**Note the shape of this correction.** §M5.2's occupancy reasoning was right that a
+blocking send holds a wallet; it was wrong to treat that as a fact about *the rail* rather
+than about *the method chosen for it*. Picking async makes the serialisation disappear
+instead of sizing a wallet pool to absorb it — `ARCHITECTURE.md` ADR-3 records the link.
+
+**Bridge fallback, if sync misbehaves on the day:** submit the aggregate async and poll.
+It is **one** call, so the extra round trip costs only latency, and FR-SPLIT-8's 5-second
+stall rule already covers non-confirmation (show the rehearsal hash, say plainly what it
+is). **Do not cut the session count in any fallback branch** — an earlier version said to,
+on the basis of a ceiling since retracted.
+
+### §M-RETRACTION · Both RPC ceilings withdrawn
+
+Neither **40–45 req/s** nor **10 tx/s** may be quoted as a capacity limit anywhere.
+A re-test returned 25 tx/s clean, 40 tx/s with 10 timeouts, and **60 tx/s clean from the
+same wallet** — a failure rate that does not rise with load is not a ceiling. Use **"at
+least 60 tx/s single-wallet, ceiling unknown, expect ~1–3% transient timeouts at any
+rate."**
+
+Affected here: §0.2's wallet config (`POOL_SIZE: 1`), §M5.3's pool bring-up (the pool is
+**optional-unproven** — do not build it before freeze), and §M6.5's profiles (the 25 tx/s
+`stress` profile is not past any known limit).
+
+**What survives and is now load-bearing:** §M5.9's retry behaviour and §M5.5's degradation
+ladder. `ARCHITECTURE.md` §16.10 carries the full reasoning, the "measure the shape, not
+the point" rule, and why §16's split is not reopening.
 
 **Fallback if it is absent or unreliable:** set `USE_SYNC_SEND: false`, take
 `eth_sendRawTransaction` plus a receipt poll, **and cut the simulated session count in
