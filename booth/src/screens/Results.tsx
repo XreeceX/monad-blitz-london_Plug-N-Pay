@@ -1,4 +1,4 @@
-// Results — booth spec §3.7. One primary action: CHARGE AGAIN, same car.
+// Results — one-shot presentation round. No replay; leaderboard is the next step.
 
 import { Counter, fmtWh, fmtMon } from '../components/Counter'
 import { claimCode } from '../game/cars'
@@ -10,13 +10,12 @@ interface Props {
   deviceId: string
   result: RunResult
   bestScore: number
-  onAgain: () => void
   onLeaderboard: () => void
 }
 
 const CLAIM_URL = import.meta.env.VITE_CLAIM_FORM_URL as string | undefined
 
-export function Results({ car, deviceId, result, bestScore, onAgain, onLeaderboard }: Props) {
+export function Results({ car, deviceId, result, bestScore, onLeaderboard }: Props) {
   return (
     <div className="screen results">
       <p className="label results-title">SESSION COMPLETE</p>
@@ -29,7 +28,6 @@ export function Results({ car, deviceId, result, bestScore, onAgain, onLeaderboa
         )}
       </div>
 
-      {/* Charged and paid are the headline; V2G is an added bonus below. */}
       <div className="results-grid hairline-top">
         <Counter value={fmtWh(result.whCharged)} unit="Wh" label="CHARGED" />
         <Counter value={fmtMon(result.monPaid)} unit="MON" label="PAID" />
@@ -43,10 +41,7 @@ export function Results({ car, deviceId, result, bestScore, onAgain, onLeaderboa
           </span>
         </div>
       ) : (
-        <p className="flip-note muted">
-          Bonus missed — fill the battery to 100% before time runs out to sell back to
-          the grid.
-        </p>
+        <p className="flip-note muted">Bonus missed — the battery didn’t hit 100% before time ran out.</p>
       )}
 
       <div className="plate-chip num results-plate">
@@ -54,15 +49,14 @@ export function Results({ car, deviceId, result, bestScore, onAgain, onLeaderboa
       </div>
 
       <div className="results-actions">
-        <button className="primary" onClick={onAgain}>
-          CHARGE AGAIN
+        <button className="primary" onClick={onLeaderboard}>
+          LEADERBOARD
         </button>
-        <button onClick={onLeaderboard}>LEADERBOARD</button>
       </div>
 
       <p className="claim-line">
-        Claim code <span className="num">{claimCode(deviceId)}</span> — keep this to
-        prove a winning run.
+        Claim code <span className="num">{claimCode(deviceId)}</span> — keep this to prove a
+        winning run.
         {CLAIM_URL && (
           <>
             {' '}

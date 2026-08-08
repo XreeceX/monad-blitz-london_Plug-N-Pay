@@ -1,4 +1,5 @@
-// Screen state machine — booth spec §3, plus host lobby for synchronized rounds.
+// Screen state machine — booth spec §3, plus host lobby for a single synced round.
+// Frontpage is host-only. Players arrive only via the QR (?room=CODE).
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAppState, type RunResult } from './state/session'
@@ -17,7 +18,7 @@ import {
   endSession,
   type SessionConfig,
 } from './net/relay'
-import { createRoom, getRoom, roomFromLocation } from './net/room'
+import { createRoom, roomFromLocation } from './net/room'
 
 type Mode = 'landing' | 'host' | 'waiting' | 'play'
 
@@ -40,12 +41,9 @@ export default function App() {
   })
   const [roomId, setRoomId] = useState<string | null>(() => initialRoom)
   const [hostToken, setHostToken] = useState<string | null>(() => initialHost)
-  const [joinCode, setJoinCode] = useState('')
-  const [joining, setJoining] = useState(false)
-  const [joinError, setJoinError] = useState<string | null>(null)
+  const [hosting, setHosting] = useState(false)
   const [hostError, setHostError] = useState<string | null>(null)
 
-  // Deep-link: ?room=ABCD → waiting (or host if we still have the token).
   useEffect(() => {
     const id = roomFromLocation()
     if (!id) return
@@ -65,40 +63,23 @@ export default function App() {
   }, [dispatch])
 
   const onHost = useCallback(async () => {
+    setHosting(true)
     setHostError(null)
     const created = await createRoom()
+    setHosting(false)
     if (!created) {
-      setHostError('Could not create a room — start the booth server first.')
+      setHostError('Could not open the lobby — is the booth server running?')
       return
     }
     setRoomId(created.roomId)
     setHostToken(created.hostToken)
     sessionStorage.setItem(`pnp.host.${created.roomId}`, created.hostToken)
-    // Put the room in the URL so refreshing the host screen keeps the lobby.
     const url = new URL(window.location.href)
     url.searchParams.set('room', created.roomId)
     url.hash = 'host'
     window.history.replaceState(null, '', url.toString())
     setMode('host')
   }, [])
-
-  const onJoin = useCallback(async () => {
-    setJoining(true)
-    setJoinError(null)
-    const id = joinCode.trim().toUpperCase()
-    const room = await getRoom(id)
-    setJoining(false)
-    if (!room) {
-      setJoinError('Room not found. Check the code on the host screen.')
-      return
-    }
-    setRoomId(id)
-    const url = new URL(window.location.href)
-    url.searchParams.set('room', id)
-    url.hash = ''
-    window.history.replaceState(null, '', url.toString())
-    setMode('waiting')
-  }, [joinCode])
 
   const leaveRoom = useCallback(() => {
     setRoomId(null)
@@ -151,15 +132,7 @@ export default function App() {
     return (
       <>
         <div className="sim-label">SIMULATION — SAME ENGINE, NOTHING ON-CHAIN</div>
-        <Landing
-          onHost={() => void onHost()}
-          onSolo={enterPlay}
-          joinCode={joinCode}
-          onJoinCode={setJoinCode}
-          onJoin={() => void onJoin()}
-          joining={joining}
-          error={joinError ?? hostError}
-        />
+        <Landing onHost={() => void onHost()} hosting={hosting} error={hostError} />
       </>
     )
   }
@@ -168,27 +141,18 @@ export default function App() {
     return (
       <>
         <div className="sim-label">SIMULATION — SAME ENGINE, NOTHING ON-CHAIN</div>
-        <HostLobby
-          roomId={roomId}
-          hostToken={hostToken}
-          onLive={() => {
-            // Keep the host on this screen — player phones leave Waiting together.
-            // Optional: open the public wall in another tab at /#wall?room=…
-          }}
-          onBack={leaveRoom}
-        />
+        <HostLobby roomId={roomId} hostToken={hostToken} onBack={leaveRoom} />
       </>
     )
   }
 
-  // Host who lost their token (refresh) but still has ?room=& #host — show read-only wait.
   if (mode === 'host' && roomId && !hostToken) {
     return (
       <>
         <div className="sim-label">SIMULATION — SAME ENGINE, NOTHING ON-CHAIN</div>
         <div className="screen landing">
           <p className="landing-error">
-            Host session expired after refresh. Create a new room from the frontpage.
+            Host session expired after refresh. Open a new lobby from the frontpage.
           </p>
           <button className="primary" onClick={leaveRoom}>
             BACK
@@ -208,7 +172,6 @@ export default function App() {
           nickname={state.nickname}
           car={state.car}
           onStart={enterPlay}
-          onLeave={leaveRoom}
         />
       </>
     )
@@ -238,7 +201,6 @@ export default function App() {
           deviceId={state.deviceId}
           result={state.lastRun}
           bestScore={state.bestScore}
-          onAgain={() => dispatch({ type: 'go', screen: 'garage' })}
           onLeaderboard={() => dispatch({ type: 'go', screen: 'leaderboard' })}
         />
       )}

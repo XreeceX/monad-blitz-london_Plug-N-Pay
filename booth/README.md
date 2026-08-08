@@ -15,13 +15,13 @@ npm install
 npm run dev        # Vite (:5173) + room server (:3001), proxied together
 ```
 
-- Frontpage: `http://<your-ip>:5173/` — **HOST THIS ROUND**, join by code, or play solo
-- Host lobby: big-screen QR + player list + **START ROUND**
-- Players scanning the QR land in a waiting lobby and enter the game together when you start
-- Public wall: `http://<your-ip>:5173/?room=ABCD#wall` (also opened from the host screen)
-  - Seal the standings (FR-BOOTH-11): press `S` twice within 3 seconds
+- Host frontpage: `http://<your-ip>:5173/` → **OPEN HOST LOBBY** (projector)
+- Players join only by scanning the QR — waiting lobby until you hit **START ROUND**
+- One presentation round; no solo / no typed room codes
+- Standings wall: opened from the host screen after start (`?#wall`)
+  - Seal (FR-BOOTH-11): press `S` twice within 3 seconds
 
-Solo play still works with the server down. Hosted rooms need the room server.
+The room server is required for the hosted round.
 
 ## For the backend (game server, M10)
 

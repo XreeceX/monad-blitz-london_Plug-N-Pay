@@ -38,43 +38,6 @@
 
 .landing-host { width: 100%; padding: 18px 20px; font-size: 16px; }
 .landing-host-hint { text-align: center; line-height: 1.5; }
-
-.landing-divider {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 8px 0 0;
-}
-.landing-divider::before,
-.landing-divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--line);
-}
-
-.landing-join {
-  display: flex;
-  gap: 8px;
-}
-.join-input {
-  flex: 1;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  color: var(--text);
-  padding: 12px 14px;
-  font-size: 18px;
-  letter-spacing: 0.2em;
-  text-align: center;
-}
-.join-input::placeholder { letter-spacing: 0.08em; color: var(--muted); }
-
-.landing-solo {
-  margin-top: 8px;
-  border-color: transparent;
-  color: var(--muted);
-}
 .landing-error {
   color: var(--cyan);
   font-size: 13px;

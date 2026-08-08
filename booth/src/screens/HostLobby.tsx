@@ -1,17 +1,16 @@
-// Host frontpage — QR on the big screen, live joiners, START when ready.
+// Host screen for the presentation — QR up, watch joiners, start once.
 
 import { useEffect, useRef, useState } from 'react'
 import QRCode from 'qrcode'
-import { getRoom, joinUrl, resetRoom, startRoom, type RoomState } from '../net/room'
+import { getRoom, joinUrl, startRoom, type RoomState } from '../net/room'
 
 interface Props {
   roomId: string
   hostToken: string
-  onLive: () => void
   onBack: () => void
 }
 
-export function HostLobby({ roomId, hostToken, onLive, onBack }: Props) {
+export function HostLobby({ roomId, hostToken, onBack }: Props) {
   const [room, setRoom] = useState<RoomState | null>(null)
   const [starting, setStarting] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -33,7 +32,6 @@ export function HostLobby({ roomId, hostToken, onLive, onBack }: Props) {
       const r = await getRoom(roomId)
       if (dead || !r) return
       setRoom(r)
-      if (r.status === 'live') onLive()
     }
     void poll()
     const t = setInterval(poll, 1000)
@@ -41,7 +39,7 @@ export function HostLobby({ roomId, hostToken, onLive, onBack }: Props) {
       dead = true
       clearInterval(t)
     }
-  }, [roomId, onLive])
+  }, [roomId])
 
   async function onStart() {
     setStarting(true)
@@ -53,21 +51,16 @@ export function HostLobby({ roomId, hostToken, onLive, onBack }: Props) {
       return
     }
     setRoom(r)
-    onLive()
-  }
-
-  async function onNewRound() {
-    const r = await resetRoom(roomId, hostToken)
-    if (r) setRoom(r)
   }
 
   const count = room?.count ?? 0
+  const live = room?.status === 'live'
 
   return (
     <div className="screen host-lobby">
       <header className="host-head">
         <div>
-          <p className="label">HOST LOBBY</p>
+          <p className="label">HOST · ONE ROUND</p>
           <h1 className="host-title">PLUG-N-PAY</h1>
         </div>
         <div className="host-code-block">
@@ -107,9 +100,9 @@ export function HostLobby({ roomId, hostToken, onLive, onBack }: Props) {
           </ol>
 
           <div className="host-actions">
-            {room?.status === 'live' ? (
+            {live ? (
               <>
-                <p className="live-note">ROUND LIVE — every phone just entered the game</p>
+                <p className="live-note">ROUND LIVE — every phone is in the game</p>
                 <button
                   className="primary"
                   onClick={() => {
@@ -118,7 +111,6 @@ export function HostLobby({ roomId, hostToken, onLive, onBack }: Props) {
                 >
                   OPEN STANDINGS WALL
                 </button>
-                <button onClick={() => void onNewRound()}>NEW ROUND (BACK TO LOBBY)</button>
               </>
             ) : (
               <button
@@ -131,7 +123,7 @@ export function HostLobby({ roomId, hostToken, onLive, onBack }: Props) {
             )}
             {err && <p className="landing-error">{err}</p>}
             <button className="host-back" onClick={onBack}>
-              LEAVE HOST
+              CLOSE LOBBY
             </button>
           </div>
         </aside>

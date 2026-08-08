@@ -11,10 +11,9 @@ interface Props {
   nickname: string
   car: CarSpec
   onStart: () => void
-  onLeave: () => void
 }
 
-export function Waiting({ roomId, deviceId, nickname, car, onStart, onLeave }: Props) {
+export function Waiting({ roomId, deviceId, nickname, car, onStart }: Props) {
   const [room, setRoom] = useState<RoomState | null>(null)
   const [failed, setFailed] = useState(false)
   const fired = useRef(false)
@@ -83,10 +82,8 @@ export function Waiting({ roomId, deviceId, nickname, car, onStart, onLeave }: P
 
       <p className="waiting-terms muted">
         Top 10 share 20% of any cash prize we win — nothing if we don't place. Multiple
-        fingers are allowed.
+        fingers are allowed. One round.
       </p>
-
-      <button onClick={onLeave}>LEAVE</button>
     </div>
   )
 }
