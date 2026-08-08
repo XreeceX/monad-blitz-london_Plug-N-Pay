@@ -21,7 +21,7 @@
 //     moves except gas.
 //   - Nothing is sent without --send.
 
-import { createWalletClient, createPublicClient, http, parseGwei } from 'viem';
+import { createWalletClient, createPublicClient, http } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { monadTestnet } from 'viem/chains';
 
@@ -69,6 +69,16 @@ if (!SEND) {
   process.exit(0);
 }
 
+// Fees are read from the chain, not hardcoded. A fixed maxFeePerGas silently
+// fails every send with "Transaction fee too low" the moment the base fee rises
+// above it, which reads as a capacity ceiling when it is nothing of the kind.
+// 2x headroom because the base fee moves between phases.
+const feeEst = await pub.estimateFeesPerGas();
+const MAX_FEE = feeEst.maxFeePerGas * 2n;
+const PRIORITY = feeEst.maxPriorityFeePerGas;
+console.log(`fees     : base ${Number(feeEst.maxFeePerGas) / 1e9} gwei, bidding ${Number(MAX_FEE) / 1e9} gwei`);
+console.log(`gas cost : ~${(Number(MAX_FEE) * 21000) / 1e18} MON per tx, ~${((Number(MAX_FEE) * 21000) / 1e18 * totalTx).toFixed(3)} MON total`);
+
 // Nonces are fetched ONCE and incremented locally. Fetching per transaction would
 // serialise every send behind a round trip and measure latency, not capacity.
 const nonces = await Promise.all(
@@ -90,8 +100,8 @@ async function sendOne() {
       value: 0n,
       nonce,
       gas: 21_000n,
-      maxFeePerGas: parseGwei('60'),
-      maxPriorityFeePerGas: parseGwei('2'),
+      maxFeePerGas: MAX_FEE,
+      maxPriorityFeePerGas: PRIORITY,
     });
     return { ms: performance.now() - t0, ok: true };
   } catch (e) {
@@ -100,7 +110,7 @@ async function sendOne() {
       ? 'ratelimit'
       : m.includes('nonce')
         ? 'nonce'
-        : m.includes('underpriced') || m.includes('mempool') || m.includes('full')
+        : m.includes('underpriced') || m.includes('fee too low') || m.includes('mempool') || m.includes('full')
           ? 'mempool'
           : 'other';
     return { ms: performance.now() - t0, ok: false, kind };

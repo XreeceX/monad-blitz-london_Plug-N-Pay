@@ -435,7 +435,7 @@ Priority split (corrected — see traceability note below): FR-BOOTH-1/2/4 are *
 | FR-BOOTH-12 | Final standings MUST be reviewed before publication and revealed after the event, not at the venue. | M | I |
 | FR-BOOTH-13 | The engine MUST cap the effective tap rate at **30/s** — above any human rate, since five fingers reaches about 25/s. The cap MUST NOT sit inside the human range: at 20/s a four-finger player and a script both score 5,732, which reintroduces a tie at the prize-winning positions that soft saturation exists to prevent. An earlier score ceiling of 4,200 was also useless, sitting above the curve's own asymptote of 4,040. | M | T |
 | FR-BOOTH-14 | The app MUST accept up to 5 concurrent pointers and MUST state in its instructions that multiple fingers are allowed. Three fingers reaches 12–15 taps/s; silently discarding a third finger would penalise the best players with nothing on screen explaining why. | M | D |
-| FR-BOOTH-15 | Each booth session MUST settle on a **6-second** interval, phase-staggered per player (`offset = index × 6/N`). 60 players at 6 s is 10 tx/s, inside the pessimistic RPC budget (§13.4); unstaggered, the same load arrives as a 60-transaction spike every 6 s. | M | T |
+| FR-BOOTH-15 | Each booth session MUST settle on an **8-second** interval, phase-staggered per player (`offset = index × 8/N`). 60 players at 8 s is 7.5 tx/s against a measured single-wallet write ceiling of 10 (§13.4), leaving 25% headroom; at 6 s it was exactly 10 with none. Unstaggered, the same load arrives as a 60-transaction spike. Return to 6 s only if a wallet-pool run raises the measured ceiling. | M | T |
 | FR-BOOTH-16 | Session opens MUST complete during the join window, before the round starts, and the final settlement MUST also serve as the close. Otherwise 60 opens and 60 closes add roughly 3 tx/s of bursts on top of steady settlement. | M | T |
 
 ### M9 — Demo control & observability
@@ -519,7 +519,7 @@ Defined in `2026-08-08-booth-frontend-design.md` §8. System-level obligations:
 | ID | Requirement | Target | Ver |
 |---|---|---|---|
 | NFR-P-1 | Settlement cadence per session | **1 Hz for simulated sessions (M6) — this is the product claim.** Booth sessions (M8) settle at 6 s, because 60 of them at 1 Hz would need 60 tx/s. The two never run at full load together: UC-10 ramps simulated sessions down as phones connect, so the budget carries either ~10 simulated at 1 Hz or 60 phones at 6 s, not both | D |
-| NFR-P-2 | Concurrent sessions sustained during the demo | **60 live**, the whole room, at a 6-second settlement interval = 10 tx/s. Reached by lowering cadence rather than capping players; at 1 Hz the same 60 sessions need 60 tx/s and are impossible | D |
+| NFR-P-2 | Concurrent sessions sustained during the demo | **60 live**, the whole room, at an 8-second settlement interval = 7.5 tx/s against a measured write ceiling of 10 (§13.4). Reached by lowering cadence rather than capping players; at 1 Hz the same 60 sessions need 60 tx/s and are impossible | D |
 | NFR-P-3 | Settlement visible on the wall after landing | ≤ 1 s | D |
 | NFR-P-4 | Dashboard frame rate at target concurrency | Readable, no visible stutter | D |
 | NFR-P-5 | Booth app frame rate on mid-range Android | 60 fps | T |
@@ -722,7 +722,24 @@ Run 2026-08-08 against `https://testnet-rpc.monad.xyz` with `tools/measure-rpc.m
 - **The fifty-session stretch in NFR-P-2 is not achievable live.** 50 req/s is already past the knee for read calls, which are the cheap ones — writes add signature recovery, nonce ordering and mempool admission, so the write ceiling is strictly lower than 40. Run the stretch from a recording, or drop the claim. Attempting it live walks into RSK-1.
 - **CON-5 is closed.** The limit was undocumented; it is now measured. It was never published because it is enforced dynamically — refusals begin as a trickle (1.1% at 45 req/s) rather than a hard cutoff, so a naive test at a single rate would have missed it entirely.
 
-**What it does not settle.** These are reads. A write-path measurement needs a funded wallet and was not run. Before trusting 10 tx/s of *settlement*, repeat this against `eth_sendRawTransaction` with the relay's wallet pool (FR-REL-8) — the number will be lower, and only that number tells you whether AC-5 is safe.
+**Write path, measured 2026-08-08 (provisional).** Run with `tools/measure-write-rpc.mjs` from a single wallet:
+
+| tx/s | ok | p50 ms | verdict |
+|---|---|---|---|
+| 2 | 6/6 | 52 | clean |
+| 5 | 15/15 | 50 | clean |
+| 10 | 30/30 | 50 | **clean — ceiling** |
+| 15 | 43/45 | 159 | refused |
+| 20 | 58/60 | 530 | refused |
+| 30 | 85/90 | 1,677 | refused |
+
+**10 tx/s from one wallet, which is exactly what the design needs and therefore zero margin.** 60 players at a 6-second interval is 10 tx/s on the nose; any variance on the day costs settlements mid-pitch. The interval is therefore widened to **8 seconds** (7.5 tx/s, 25% headroom, 5 settlements per player across a 45-second round).
+
+**Provisional, for two reasons.** It ran from the well-known public test key `0x…0001`, which others also use, so contention may have depressed the result. And the failures above 10 tx/s classified as "other" rather than rate-limit, nonce or mempool, so the mechanism of refusal is not identified.
+
+**FR-REL-8 remains unproven.** Whether 10 tx/s is the node's limit or one account's nonce ordering is exactly what decides if the wallet pool is essential or wasted work, and it cannot be answered without more funded wallets — only key #1 has a balance. Re-run as `PRIVATE_KEY=k1,k2,k3 node tools/measure-write-rpc.mjs --send`. If the ceiling rises with the pool, FR-REL-8 is proven and the interval can go back to 6 seconds.
+
+**One bug worth recording**, because it would otherwise be repeated: the first run hardcoded `maxFeePerGas` at 60 gwei while the base fee was 102. Every send failed with "Transaction fee too low" and the tool reported a ceiling below 2 tx/s — a fabricated capacity limit that was purely a client-side fee bug. Fees are now read from the chain per run.
 
 ---
 

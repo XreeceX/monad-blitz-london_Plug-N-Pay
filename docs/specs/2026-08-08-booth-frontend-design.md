@@ -245,7 +245,8 @@ TAPER_START_SOC    = 0.80
 TAPER_FLOOR        = 0.25     // multiplier at 100% SoC
 SURGE_WINDOWS_MS   = [[10000, 13000], [24000, 27000], [36000, 39000]]
 SURGE_MULTIPLIER   = 2.0
-SETTLE_INTERVAL_MS = 6_000    // per player; phase-staggered. See §8
+SETTLE_INTERVAL_MS = 8_000    // per player; phase-staggered. 7.5 tx/s at 60
+                              // players vs a measured ceiling of 10. See §8
 PRICE_MON_PER_KWH  = 0.12     // charging, player pays
 V2G_MON_PER_KWH    = 0.30     // sell-back premium, player earns
 ```
