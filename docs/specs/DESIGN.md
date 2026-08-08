@@ -1835,8 +1835,10 @@ constraints forbid. Write the presenter's sentence now, not on stage:
 > *"That's the rehearsal aggregate from ten minutes ago — the live one is still
 > confirming. Same contract, same wallet, you can check both."*
 
-**Margin:** one transaction against a measured 10 tx/s ceiling is **tenfold headroom**
-and confirms inside a second (`REQUIREMENTS.md:809`).
+**Margin:** one transaction is trivially safe at any observed rate — a single wallet has
+run **60 tx/s clean** (`REQUIREMENTS.md:728`) — and it confirms inside a second. The
+baseline's own phrasing cited a 10 tx/s ceiling that has since been retracted; the
+conclusion is unchanged and now has more room, not less.
 
 ## Module map, updated
 
