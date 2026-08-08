@@ -93,7 +93,9 @@ export function Charging({ car, session, onEnd }: Props) {
     const ripples = Array.from(root.querySelectorAll<HTMLDivElement>('.ripple'))
     let rippleIdx = 0
 
-    function onDown(e: PointerEvent) {
+    // Arrow, not a hoisted `function` — a function declaration can be called
+    // before the null guard above, so TypeScript drops the narrowing on `root`.
+    const onDown = (e: PointerEvent) => {
       if (endedRef.current) return
       // Ignore secondary buttons; every finger counts.
       if (e.pointerType === 'mouse' && e.button !== 0) return
