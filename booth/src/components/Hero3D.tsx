@@ -77,8 +77,8 @@ export function Hero3D() {
         <svg className="hero3d-cable" viewBox="0 0 400 220" preserveAspectRatio="none">
           {/* The box is stretched to fit the scene, so the stroke has to opt
               out of that scale or it renders as a lopsided smear. */}
-          <path className="hero3d-cable-slack" d="M 24 40 C 90 130, 150 176, 268 168" fill="none" stroke="var(--cyan-dim)" strokeWidth="4" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-          <path className="hero3d-cable-flow" d="M 24 40 C 90 130, 150 176, 268 168" fill="none" stroke="var(--cyan-hot)" strokeWidth="4" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+          <path className="hero3d-cable-slack" d="M 24 40 C 90 132, 156 180, 292 176" fill="none" stroke="var(--cyan-dim)" strokeWidth="4" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+          <path className="hero3d-cable-flow" d="M 24 40 C 90 132, 156 180, 292 176" fill="none" stroke="var(--cyan-hot)" strokeWidth="4" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
         </svg>
 
         {/* Top-down art laid onto the ground plane. */}

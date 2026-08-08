@@ -198,10 +198,14 @@
 
 /* Top-down art tipped onto the ground plane. 58deg, not the floor's 68deg —
    a flatter car is the honest angle but an unreadable one. */
+/* Parked at the post, not across the bay from it. `left` is a layout offset
+   applied before the transform, so perspective magnifies its distance from the
+   50% origin by roughly 1.9x here — the rendered gap has to be divided by that
+   before it becomes a percentage. */
 .hero3d-car {
   position: absolute;
-  left: 62%;
-  top: 22%;
+  left: 53%;
+  top: 20%;
   transform-origin: 50% 100%;
   transform: translate(-50%, 0) rotateX(58deg) scale(1.15);
   filter: drop-shadow(0 30px 40px rgba(0, 0, 0, 0.72));
@@ -217,7 +221,7 @@
   .hero3d { top: 56%; perspective: 800px; }
   .hero3d-post { left: 20%; transform: translate(-50%, 0) translateZ(40px) scale(0.7); }
   .hero3d-cable { left: 18%; width: 44%; }
-  .hero3d-car { left: 66%; animation: none; transform: translate(-50%, 0) rotateX(58deg) scale(0.78); }
+  .hero3d-car { left: 56%; animation: none; transform: translate(-50%, 0) rotateX(58deg) scale(0.78); }
 }
 
 .landing-center {
