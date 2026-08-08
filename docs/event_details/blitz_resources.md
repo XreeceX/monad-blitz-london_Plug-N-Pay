@@ -1,0 +1,1 @@
+https://monad-foundation.notion.site/Blitz-resources-3036367594f2802a92c6f2d063f832ef
