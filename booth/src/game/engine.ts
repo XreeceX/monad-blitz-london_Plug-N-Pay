@@ -46,7 +46,13 @@ export interface Engine {
   update(nowMs: number): EngineSnapshot
   snapshot(): EngineSnapshot
   /** Drain the per-second tick accumulator for the relay (§8). */
-  drainTick(): { t: number; kW: number; whDelta: number; taps: number }
+  drainTick(): {
+    t: number
+    kW: number
+    whDelta: number
+    taps: number
+    phase: 'charge' | 'v2g'
+  }
 }
 
 export function score(whCharged: number, whDischarged: number): number {
@@ -184,6 +190,7 @@ export function createEngine(
         kW: Math.round(kW * 10) / 10,
         whDelta: Math.round(tickWh * 100) / 100,
         taps: tickTaps,
+        phase: phase === 'v2g' ? ('v2g' as const) : ('charge' as const),
       }
       tickWh = 0
       tickTaps = 0

@@ -14,8 +14,8 @@ const ROOM_TTL_MS = 2 * 60 * 60 * 1000 // 2h
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 
 /** @typedef {{ deviceId: string, nick: string, carId: string, carName: string, hue: number, joinedAt: number, lastSeen: number, bestScore: number }} Player */
-/** @typedef {{ id: string, hostToken: string, status: 'lobby'|'live'|'ended'|'closed', createdAt: number, startedAt: number|null, players: Map<string, Player>, scores: Map<string, { nick: string, score: number, carName: string, at: number }>, totalWh: number, totalMon: number }} Room */
-/** @typedef {{ sessionId: string, deviceId: string, nick: string, carId: string, roomId: string|null, lastSeq: number, lastKW: number, totalWh: number, totalMon: number, priceMonPerKwh: number, v2gMonPerKwh: number, lastSeen: number, ended: boolean }} LiveSession */
+/** @typedef {{ id: string, hostToken: string, status: 'lobby'|'live'|'ended'|'closed', createdAt: number, startedAt: number|null, players: Map<string, Player>, scores: Map<string, { nick: string, score: number, carName: string, at: number }>, totalWh: number, totalMon: number, totalV2gMon: number, livePower: Map<string, { kW: number, at: number }> }} Room */
+/** @typedef {{ sessionId: string, deviceId: string, nick: string, carId: string, roomId: string|null, lastSeq: number, lastKW: number, totalWh: number, totalMon: number, totalV2gMon: number, priceMonPerKwh: number, v2gMonPerKwh: number, lastSeen: number, ended: boolean }} LiveSession */
 
 /** @type {Map<string, Room>} */
 const rooms = new Map()
@@ -23,7 +23,30 @@ const rooms = new Map()
 const sessions = new Map()
 
 /** A session counts as "live" on the wall while ticks arrived within this window. */
-const LIVE_MS = 5_000
+const LIVE_MS = 10_000
+
+function bindSessionRoom(sess) {
+  if (sess.roomId && rooms.has(sess.roomId)) return rooms.get(sess.roomId)
+  for (const room of rooms.values()) {
+    if (room.players.has(sess.deviceId)) {
+      sess.roomId = room.id
+      return room
+    }
+  }
+  return null
+}
+
+function roomLiveKW(room, now = Date.now()) {
+  let total = 0
+  for (const [deviceId, pow] of room.livePower) {
+    if (now - pow.at > LIVE_MS) {
+      room.livePower.delete(deviceId)
+      continue
+    }
+    total += pow.kW
+  }
+  return total
+}
 
 function code(n = 4) {
   const bytes = randomBytes(n)
@@ -113,6 +136,8 @@ app.post('/api/room', (_req, res) => {
     scores: new Map(),
     totalWh: 0,
     totalMon: 0,
+    totalV2gMon: 0,
+    livePower: new Map(),
   }
   rooms.set(id, room)
   res.json({ roomId: id, hostToken, serverNow: Date.now() })
@@ -203,12 +228,15 @@ app.post('/api/session', (req, res) => {
     lastKW: 0,
     totalWh: 0,
     totalMon: 0,
+    totalV2gMon: 0,
     priceMonPerKwh,
     v2gMonPerKwh,
     lastSeen: Date.now(),
     ended: false,
   }
   sessions.set(sessionId, sess)
+  // Eager bind so the first tick already has a room even if roomId was omitted.
+  bindSessionRoom(sess)
 
   res.json({
     sessionId,
@@ -238,33 +266,32 @@ app.post('/api/tick', (req, res) => {
   const ticks = Array.isArray(body.ticks) ? body.ticks : []
   let batchWh = 0
   let batchMon = 0
+  let batchV2gMon = 0
   let lastKW = sess.lastKW
   for (const t of ticks) {
     const kW = Number(t?.kW) || 0
     const whDelta = Math.abs(Number(t?.whDelta) || 0)
+    const phase = t?.phase === 'v2g' ? 'v2g' : 'charge'
     lastKW = kW
     batchWh += whDelta
-    // Display aggregate only — charge rate; V2G premium is reflected in score, not this meter.
-    batchMon += (whDelta / 1000) * sess.priceMonPerKwh
+    if (phase === 'v2g') {
+      batchV2gMon += (whDelta / 1000) * sess.v2gMonPerKwh
+    } else {
+      batchMon += (whDelta / 1000) * sess.priceMonPerKwh
+    }
   }
   sess.lastKW = lastKW
   sess.totalWh += batchWh
   sess.totalMon += batchMon
+  sess.totalV2gMon += batchV2gMon
   sess.lastSeen = Date.now()
 
-  // Bind to a room if the phone omitted roomId — match the joined player seat.
-  if (!sess.roomId || !rooms.has(sess.roomId)) {
-    for (const room of rooms.values()) {
-      if (room.players.has(sess.deviceId)) {
-        sess.roomId = room.id
-        break
-      }
-    }
-  }
-  if (sess.roomId && rooms.has(sess.roomId)) {
-    const room = rooms.get(sess.roomId)
+  const room = bindSessionRoom(sess)
+  if (room) {
     room.totalWh += batchWh
     room.totalMon += batchMon
+    room.totalV2gMon += batchV2gMon
+    room.livePower.set(sess.deviceId, { kW: lastKW, at: Date.now() })
   }
 
   res.sendStatus(204)
@@ -286,6 +313,8 @@ app.post('/api/session/end', (req, res) => {
   const carName = String(req.body?.carName ?? '')
   const deviceId = String(req.body?.deviceId ?? sess?.deviceId ?? sessionId ?? 'x')
   const sc = Math.round(Number(score) || 0)
+  const monEarned = Math.max(0, Number(req.body?.monEarned) || 0)
+  const monPaid = Math.max(0, Number(req.body?.monPaid) || 0)
 
   // If client never opened a room-scoped session, attach ended Wh to the live room once.
   if (sess && !sess.roomId && roomId && rooms.has(roomId)) {
@@ -293,10 +322,25 @@ app.post('/api/session/end', (req, res) => {
     const room = rooms.get(roomId)
     room.totalWh += sess.totalWh
     room.totalMon += sess.totalMon
+    room.totalV2gMon += sess.totalV2gMon
   }
 
-  if (roomId && rooms.has(roomId)) {
-    const room = rooms.get(roomId)
+  const room = roomId && rooms.has(roomId) ? rooms.get(roomId) : sess ? bindSessionRoom(sess) : null
+  if (room) {
+    room.livePower.delete(deviceId)
+    // Reconcile V2G / charge cash from the phone's authoritative end totals.
+    if (sess) {
+      if (monEarned > sess.totalV2gMon) {
+        room.totalV2gMon += monEarned - sess.totalV2gMon
+        sess.totalV2gMon = monEarned
+      }
+      if (monPaid > sess.totalMon) {
+        room.totalMon += monPaid - sess.totalMon
+        sess.totalMon = monPaid
+      }
+    } else if (monEarned > 0) {
+      room.totalV2gMon += monEarned
+    }
     const prev = room.scores.get(deviceId)
     if (!prev || sc > prev.score) {
       room.scores.set(deviceId, { nick, score: sc, carName, at: Date.now() })
@@ -305,7 +349,7 @@ app.post('/api/session/end', (req, res) => {
     if (p && sc > p.bestScore) p.bestScore = sc
   }
 
-  const entries = roomLeaderboard(roomId)
+  const entries = roomLeaderboard(room?.id ?? roomId)
   const mine = entries.find((e) => e.deviceId === deviceId)
   res.json({ rank: mine?.rank ?? entries.length + 1, top: entries.slice(0, 10) })
 })
@@ -350,6 +394,7 @@ app.get('/api/wall', (req, res) => {
       totalKW: 0,
       totalWh: 0,
       totalMon: 0,
+      totalV2gMon: 0,
       count: 0,
       surgeAt: null,
       status: 'idle',
@@ -358,6 +403,8 @@ app.get('/api/wall', (req, res) => {
   }
 
   const now = Date.now()
+  const totalKW = roomLiveKW(room, now)
+
   /** @type {Map<string, LiveSession>} */
   const byDevice = new Map()
   for (const sess of sessions.values()) {
@@ -367,27 +414,25 @@ app.get('/api/wall', (req, res) => {
     if (!prev || sess.lastSeen > prev.lastSeen) byDevice.set(sess.deviceId, sess)
   }
 
-  let totalKW = 0
   const players = [...room.players.values()].map((p) => {
     const sess = byDevice.get(p.deviceId)
-    const live = Boolean(sess && !sess.ended && now - sess.lastSeen <= LIVE_MS)
-    const kW = live ? sess.lastKW : 0
-    totalKW += kW
+    const pow = room.livePower.get(p.deviceId)
+    const live = Boolean(pow && now - pow.at <= LIVE_MS)
+    const kW = live ? pow.kW : 0
     return {
       id: p.deviceId,
       nick: p.nick,
       hue: p.hue,
       kW,
       soc: 0,
-      phase: live ? 'charge' : room.status === 'live' ? 'idle' : 'idle',
+      phase: live ? (sess && !sess.ended ? 'charge' : 'charge') : 'idle',
     }
   })
 
-  // Also count live sessions that joined via ticks but somehow missed the player map
-  for (const sess of byDevice.values()) {
-    if (room.players.has(sess.deviceId)) continue
-    const live = !sess.ended && now - sess.lastSeen <= LIVE_MS
-    if (live) totalKW += sess.lastKW
+  // Count currently drawing cars for the "live" meter caption.
+  let liveCars = 0
+  for (const pow of room.livePower.values()) {
+    if (now - pow.at <= LIVE_MS && pow.kW > 0) liveCars += 1
   }
 
   res.json({
@@ -395,7 +440,9 @@ app.get('/api/wall', (req, res) => {
     totalKW,
     totalWh: room.totalWh,
     totalMon: room.totalMon,
+    totalV2gMon: room.totalV2gMon,
     count: players.length,
+    liveCars,
     surgeAt: null,
     status: room.status,
     roomId: room.id,

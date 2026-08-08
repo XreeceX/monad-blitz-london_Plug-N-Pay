@@ -122,6 +122,8 @@ export default function App() {
           whDischarged: partial.whDischarged,
           score: partial.score,
           tapCount: partial.tapCount,
+          monPaid: partial.monPaid,
+          monEarned: partial.monEarned,
           roomId: roomId ?? undefined,
           deviceId: state.deviceId,
           nickname: state.nickname,
@@ -135,59 +137,41 @@ export default function App() {
   )
 
   if (mode === 'landing') {
-    return (
-      <>
-        <div className="sim-label">SIMULATION — SAME ENGINE, NOTHING ON-CHAIN</div>
-        <Landing onHost={() => void onHost()} hosting={hosting} error={hostError} />
-      </>
-    )
+    return <Landing onHost={() => void onHost()} hosting={hosting} error={hostError} />
   }
 
   if (mode === 'host' && roomId && hostToken) {
-    return (
-      <>
-        <div className="sim-label">SIMULATION — SAME ENGINE, NOTHING ON-CHAIN</div>
-        <HostLobby roomId={roomId} hostToken={hostToken} onBack={leaveRoom} />
-      </>
-    )
+    return <HostLobby roomId={roomId} hostToken={hostToken} onBack={leaveRoom} />
   }
 
   if (mode === 'host' && roomId && !hostToken) {
     return (
-      <>
-        <div className="sim-label">SIMULATION — SAME ENGINE, NOTHING ON-CHAIN</div>
-        <div className="screen landing">
-          <p className="landing-error">
-            Host session expired after refresh. Open a new lobby from the frontpage.
-          </p>
-          <button className="primary" onClick={leaveRoom}>
-            BACK
-          </button>
-        </div>
-      </>
+      <div className="screen landing">
+        <p className="landing-error">
+          Host session expired after refresh. Open a new lobby from the frontpage.
+        </p>
+        <button className="primary" onClick={leaveRoom}>
+          BACK
+        </button>
+      </div>
     )
   }
 
   if (mode === 'waiting' && roomId) {
     return (
-      <>
-        <div className="sim-label">SIMULATION — SAME ENGINE, NOTHING ON-CHAIN</div>
-        <Waiting
-          roomId={roomId}
-          deviceId={state.deviceId}
-          nickname={state.nickname}
-          car={state.car}
-          onStart={enterPlay}
-          onLeave={leaveRoom}
-        />
-      </>
+      <Waiting
+        roomId={roomId}
+        deviceId={state.deviceId}
+        nickname={state.nickname}
+        car={state.car}
+        onStart={enterPlay}
+        onLeave={leaveRoom}
+      />
     )
   }
 
   return (
     <>
-      <div className="sim-label">SIMULATION — SAME ENGINE, NOTHING ON-CHAIN</div>
-
       {state.screen === 'reveal' && (
         <Reveal
           car={state.car}
@@ -214,7 +198,10 @@ export default function App() {
       {state.screen === 'leaderboard' && (
         <Leaderboard
           nickname={state.nickname}
+          deviceId={state.deviceId}
           bestScore={state.bestScore}
+          roomId={roomId}
+          myRank={state.lastRun?.rank ?? null}
           cachedTop={state.lastRun?.top ?? null}
           onBack={() =>
             dispatch({ type: 'go', screen: state.lastRun ? 'results' : 'garage' })
