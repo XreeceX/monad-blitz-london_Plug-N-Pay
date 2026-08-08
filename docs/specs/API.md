@@ -666,7 +666,7 @@ noted as deferred/not-built.
 | Gas limit table (§1.5) | project `CLAUDE.md` gas hard rule, `monad-facts.md` Q6, ARCHITECTURE.md §6.3 |
 | `eth_sendRawTransactionSync` usage note | `monad-facts.md` Q7, ARCHITECTURE.md ADR-3 |
 | Trust-boundary cross-reference (TB-1..TB-5) | ARCHITECTURE.md §2.3 — reference only, not a new obligation |
-| Wallet pool size = 10 (`/relay/mode`'s `walletPoolSize`) | ARCHITECTURE.md ADR-2, §5.5 |
+| Wallet pool size = 2–3 (`/relay/mode`'s `walletPoolSize`) | Corrected from ARCHITECTURE.md ADR-2's pre-§16 figure of 10 — §3.2, §9 |
 | **Deferred, no API surface in this build** | FR-SET-11 (W, rate-based streaming — a live oracle or streaming-balance model would replace `setRate`/`settle`'s discrete math, not add new endpoints), FR-ID-7 (C, cert-derived session keys — would replace `registerIdentity`'s key source, not its shape), FR-MET-8 (C, real hardware — same §2 payload shape, no API change), FR-PR-5 (C, live oracle — would call the existing `setRate`, not a new function), FR-SIM-4/5 (S — spawner behaviour, not an API surface) |
 | **Not an API-doc obligation** (UX/rendering/process, owned by Design or Arch doc) | FR-BOOTH-1, FR-BOOTH-2, FR-BOOTH-4, FR-BOOTH-5, FR-BOOTH-6, FR-BOOTH-7, FR-BOOTH-8, FR-BOOTH-10, FR-BOOTH-11, FR-BOOTH-12, FR-DASH-1, FR-DASH-2, FR-DASH-5, FR-DASH-7, FR-DASH-10, FR-MET-1, FR-MET-4, FR-MET-5, FR-SIM-2, FR-SIM-3, FR-OPS-4, FR-OPS-5, FR-OPS-6, NFR-P-1, NFR-P-3, NFR-P-4, NFR-P-5, NFR-P-6, NFR-R-1, NFR-U-1, NFR-U-2, NFR-U-3, NFR-U-4, NFR-M-3, CON-1..CON-7 |
 
@@ -727,7 +727,7 @@ line number. FR-REL-9-is-DONE was already correctly treated as done here.
 | 6 | Base path convention | `/v1/*` | `/relay/*` (only `/relay/tick` itself is verbatim-confirmed) | Renamed throughout; unconfirmed paths flagged (TBD #10) | ARCHITECTURE.md, partly by inference |
 | 7 | Gas limits, 4 of 5 functions | `openSession` ~100–120k, `closeSession` ~60–80k, `registerIdentity` ~80k, `setRate` ~50k | `openSession` 180k, `closeSession` 80k, `registerIdentity` 100k, `setRate` 90k (§6.3); `settle` already matched at 150k | Updated to match; adopted the ×1.15/×1.25 hardcode formula | ARCHITECTURE.md |
 | 8 | Booth on-chain settlement | Assumed always-on once forwarded to the relay | **Superseded by REQUIREMENTS.md §16: zero chain calls from the booth, ever.** FR-BOOTH-15/16 withdrawn; FR-SPLIT-1 makes a switch a violation by existing | Endpoint and switch **deleted**, not defaulted off. Crowd's only chain interaction is the `settleRoomAggregate` bridge | REQUIREMENTS.md §16 — supersedes both this doc and ARCHITECTURE.md ADR-6 |
-| 9 | Wallet pool size | Left abstract ("a pool of funded wallets") | Exactly **10** (ADR-2, §5.5) | Made concrete in `/relay/mode`'s response | ARCHITECTURE.md |
+| 9 | Wallet pool size | Left abstract ("a pool of funded wallets") | Exactly **10** (ADR-2, §5.5) | Made concrete in `/relay/mode`'s response — **since superseded, see §9: REQUIREMENTS.md §16 cuts this to 2–3** | ARCHITECTURE.md at the time; REQUIREMENTS.md §16 overrides it now |
 | 10 | Signature-fail handling | "rejected... before it ever reaches settle()" | "discard, record discrepancy, no value moves" (UC-2 alt 2a) | Cited more precisely; no substantive change | Confirmed consistent |
 | 11 | Metering `Reading` struct | `{ sessionId, seq, timestampMs, kW, whDelta, meterId, signature }` | Identical fields, signature separate (§7.1 step ①) | No change | Confirmed consistent |
 | 12 | ASM-6 / "verifies" wording | "Say verifies, never trustlessly verifies on-chain" | Full required verbatim paragraph + forbidden-phrase list (§3.4) | No contradiction — this doc already complies. §3.4's exact paragraph is now the one to paste into the README/pitch, not a paraphrase | Confirmed consistent, citation strengthened |
@@ -766,6 +766,7 @@ left as-is, a historical record rather than silently edited; this paragraph is t
 | §1 | No aggregate function | `settleRoomAggregate(roundId, totalWhMwh, totalMonWei)` — full signature, event, error, gas entry |
 | §6 | `settle`/`closeSession` rows cited `FR-BOOTH-15`/`FR-BOOTH-16` | Removed — both requirements withdrawn (REQUIREMENTS.md:438-439) |
 | §7 | 10 TBDs | 13 — three new, about the bridge's transaction lifecycle (#11, #12) and the game server's own cap (#13) |
+| §3.2, §6, §8 row 9 | `walletPoolSize: 10` (ARCHITECTURE.md ADR-2, pre-§16) | `walletPoolSize: 3` — §16 deleted the booth chain load that justified 10; one wallet already clears the real rail's 10 tx/s need alone (§13.4) |
 
 **Genuine tension, not silently resolved: FR-BOOTH-3 and FR-BOOTH-9.** REQUIREMENTS.md §16 explicitly withdraws
 only FR-BOOTH-15 and FR-BOOTH-16 by name. It does not withdraw:
