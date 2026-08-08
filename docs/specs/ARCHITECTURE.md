@@ -1958,9 +1958,9 @@ shared with strangers.
 
 **What the README must disclose (NFR-S-5), verbatim-ready:**
 
-> **Hot wallet exposure.** The relay holds the private keys for a pool of wallets funded
-> with Monad **testnet** MON only — approximately 150 MON, which has no mainnet value and
-> cannot be exchanged for anything. The keys live in the deployment host's secret store
+> **Hot wallet exposure.** The relay holds the private keys for a small pool of wallets
+> (2–3) funded with Monad **testnet** MON only — approximately **36 MON**, which has no
+> mainnet value and cannot be exchanged for anything. The keys live in the host's secret store
 > and are not in this repository. There is no mainnet deployment and no production key
 > management; both are explicitly out of scope (`REQUIREMENTS.md` §14). If you fork this,
 > generate your own keys — do not reuse any address referenced in the docs.
