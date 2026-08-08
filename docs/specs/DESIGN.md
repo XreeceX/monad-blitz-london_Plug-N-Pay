@@ -105,7 +105,9 @@ export const CFG = {
   GAS_SET_RATE:         90_000,            // (guess)
 
   // ── timing ─────────────────────────────────────────────────────────────
-  SEND_TIMEOUT_MS:     2000,               // eth_sendRawTransactionSync timeout_ms
+  RECEIPT_TIMEOUT_MS:  2000,               // async receipt poll, rail (ADR-3)
+  BRIDGE_SYNC_TIMEOUT_MS: 5000,            // sync timeout_ms, settleRoomAggregate only
+                                           //   (FR-SPLIT-8's 5 s stall rule)
   SESSION_IDLE_MS:     5000,               // FR-SET-4 close threshold
   SSE_HEARTBEAT_MS:    1000,               // wall liveness detector
 
@@ -121,7 +123,10 @@ export const CFG = {
   //   chain-writes violates that requirement BY EXISTING — inspection would find a
   //   code path that puts wallets in a phone app. Booth-on-chain is out of scope;
   //   REQUIREMENTS.md §16 is the reason. See PART II.
-  USE_SYNC_SEND:       true,               // ADR-3 — UNVERIFIED, see PART II §M-ADR3
+  // NO USE_SYNC_SEND FLAG. Transport is per call site, not global (ADR-3):
+  //   rail  settle()              -> async eth_sendRawTransaction + retry
+  //   bridge settleRoomAggregate  -> sync  eth_sendRawTransactionSync
+  // The sync method is VERIFIED present on testnet-rpc.monad.xyz (§M-ADR3).
 };
 ```
 
@@ -903,9 +908,11 @@ async function submit(entry, wallet) {
   };
   const raw = await wallet.signer.sign(tx);
 
-  const receipt = CFG.USE_SYNC_SEND
-    ? await rpc.call('eth_sendRawTransactionSync', [raw, { timeout_ms: CFG.SEND_TIMEOUT_MS }])
-    : await sendAndPoll(raw);                     // ADR-3 reversal: ALSO halve TX_BUDGET
+  // ASYNC on the rail — ADR-3, REVERSED. eth_sendRawTransactionSync BLOCKS until
+  // inclusion, which would serialise the one path that must stay concurrent.
+  // Sync is reserved for the closing settleRoomAggregate (one call, one moment).
+  const txHash  = await rpc.call('eth_sendRawTransaction', [raw]);
+  const receipt = await awaitReceipt(txHash, CFG.RECEIPT_TIMEOUT_MS);   // retry-backed
 
   pool.release(wallet, { ok: receipt?.status === '0x1' });
   if (receipt?.status === '0x1') feed.publish(settledEvent(entry, receipt));  // ADR-7
@@ -913,8 +920,15 @@ async function submit(entry, wallet) {
 }
 ```
 
-One RPC call per settled tick. The arithmetic for why this is mandatory rather than
-merely nice is in `ARCHITECTURE.md` §11 C11.
+**Two calls per settled tick, and that is fine.** The one-call-per-tick argument was an
+optimisation against an RPC ceiling that has since been retracted (§M-RETRACTION); one
+wallet ran 60 tx/s clean, so ten sessions at two calls each is nowhere near anything
+observed.
+
+**`awaitReceipt` must retry** — transient timeouts appeared at every load tested
+(`REQUIREMENTS.md:730`), which makes retry the one durable finding of the whole RPC
+exercise, not a nicety. On timeout, re-poll the same hash; **never re-send**, because the
+transaction may already be included and a re-send burns the next nonce for nothing.
 
 ### M5.5 Degraded-mode state machine (FR-REL-4, FR-REL-5, UC-8, AC-8)
 
@@ -1904,19 +1918,39 @@ single-accent palette does not obviously provide. **Confirm against the booth se
 token file before building M7.** Flagged rather than guessed; I do not own
 `2026-08-08-booth-frontend-design.md`.
 
-### §M-ADR3 · `eth_sendRawTransactionSync` is UNVERIFIED
+### §M-ADR3 · `eth_sendRawTransactionSync` — **VERIFIED, and ADR-3 reversed**
 
-`CFG.USE_SYNC_SEND: true` rests on documentation only
-(https://docs.monad.xyz/reference/json-rpc/api, fetched 2026-08-08). **It has never been
-called against `testnet-rpc.monad.xyz`.** The write measurement in `REQUIREMENTS.md`
-§13.4 used viem's standard `sendTransaction` — i.e. **async `eth_sendRawTransaction`**,
-not the sync variant.
+**The method exists** on `https://testnet-rpc.monad.xyz`. Probed with a negative control:
 
-So the measured 10 tx/s figure is for the *async* path, and §M5.4's one-RPC-call-per-tick
-claim is unproven on this endpoint.
+| Call | Response | Meaning |
+|---|---|---|
+| `eth_blockNumber` | result present | control — a method that exists |
+| `eth_thisMethodDoesNotExist` | `-32601 Method not found` | control — a method that does not |
+| **`eth_sendRawTransactionSync`** | **code 5, "The transaction is not ready to be processed"** | **a domain error → implemented** |
+| `eth_sendRawTransaction` | `-32603 Transaction decoding error` | *different* error path → distinct implementation, not an alias |
 
-**Fallback if it is absent or unreliable:** set `USE_SYNC_SEND: false`, take
-`eth_sendRawTransaction` plus a receipt poll, **and cut the simulated session count in
-the same change** — the fallback costs 2–4 RPC calls per tick instead of 1, so holding
-the session count would multiply load against an already zero-margin ceiling.
-`ARCHITECTURE.md` §16.5 carries the arithmetic.
+**But ADR-3 was backwards, and the fix is not to use it on the rail.** A sync send blocks
+until inclusion, serialising the one path that must stay concurrent. Correct split:
+
+| Path | Method | Timeout const |
+|---|---|---|
+| **Rail `settle()` (§M5.4)** | async `eth_sendRawTransaction` + retry-backed receipt poll | `RECEIPT_TIMEOUT_MS` |
+| **Bridge `settleRoomAggregate`** | **sync** — one call, one round trip, hash on screen inside a sentence | `BRIDGE_SYNC_TIMEOUT_MS` (5 s, FR-SPLIT-8) |
+
+`USE_SYNC_SEND` is **deleted** — transport is a property of the call site, not a global
+switch.
+
+**Note the shape of this correction.** §M5.2's occupancy reasoning was right that a
+blocking send holds a wallet; it was wrong to treat that as a fact about the rail rather
+than about the method chosen for it. Picking async makes the serialisation disappear
+instead of sizing a wallet pool to absorb it — `ARCHITECTURE.md` ADR-3 records the
+connection.
+
+**Bridge fallback, if sync misbehaves on the day:** submit the aggregate with async
+`eth_sendRawTransaction` and poll. It is **one** call, so the extra round trip costs
+nothing but latency — and FR-SPLIT-8's 5-second stall rule already covers the case where
+it does not confirm in time (show the rehearsal hash, say plainly what it is).
+
+**Do not cut the session count in any fallback branch.** An earlier version of this
+paragraph said to, on the basis of a zero-margin ceiling that has since been retracted
+(§M-RETRACTION).
