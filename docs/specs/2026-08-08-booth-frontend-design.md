@@ -238,7 +238,7 @@ SESSION_MS         = 45_000
 CAPACITY_KWH       = 2.2      // typical player (7 taps/s) flips at t≈35.6s
 P_MAX_KW           = 350
 R_REF_TAPS_PER_SEC = 7        // soft-saturation reference, NOT a cap
-R_HARD_CAP_PER_SEC = 20       // taps above this yield nothing. See §6
+R_HARD_CAP_PER_SEC = 30       // above any human rate. NOT 20 — see §6
 MAX_POINTERS       = 5        // multi-finger is allowed and expected
 EMA_TAU_MS         = 450
 TAPER_START_SOC    = 0.80
@@ -293,7 +293,9 @@ It also behaves better against cheating than the clamp did. Returns diminish sha
 | 9 | 4052 | 30.3s | two thumbs |
 | 12 | 4785 | 26.6s | three fingers |
 | 15 | 5269 | 25.5s | three fingers, fast |
-| 20 | 5732 | 24.6s | four fingers — engine cap |
+| 20 | 5732 | 24.6s | four fingers |
+| 25 | 5976 | 24.0s | five fingers, plausible ceiling |
+| 30+ | 6098 | 23.8s | engine cap — no human reaches this |
 
 `CAPACITY_KWH` is tuned to 2.2 for the 45-second round. A typical player flips at 35.6s and earns for the last nine seconds; a casual one at 5 taps/s flips at 42.6s, barely, right at the end, which is the best feeling available. At 4 taps/s the Flip stays out of reach, deliberately — it has to be worth chasing.
 
@@ -317,7 +319,7 @@ Real money on a public tap leaderboard. Treat the client as hostile.
 | Defence | Rule | Worth it in 2h? |
 |---|---|---|
 | Multi-finger play | **Allowed, up to 5 concurrent pointers.** Three fingers reaches 12–15 taps/s and is legitimate skill | Yes — and say so in the instructions |
-| Autoclicker | Cap the effective rate at 20 taps/s rather than rejecting. Above it everyone scores exactly 5,732, so a script gains nothing and no legitimate player is falsely accused | Yes, 1 line |
+| Autoclicker | Cap the effective rate at **30** taps/s rather than rejecting. Above it everyone scores 6,098, and no human reaches 30/s, so real players never tie while a script's edge over the best plausible human falls to 2% | Yes, 1 line |
 | Suspicious rate | Flag any run averaging over 18 taps/s for human review before the Discord reveal. Flagging is free because the reveal is delayed (§3.8) — nobody is accused in the room | Yes, cheap |
 | Direct POST to the relay | Server recomputes score from the tick stream and ignores the client's number | **P1.** Not buildable today alongside everything else |
 | Forged or replayed ticks | Idempotency on `(sessionId, seq)`; reject `seq` ≤ last seen | Yes, cheap |
@@ -330,7 +332,7 @@ It matters much less here because of the reveal design (§3.8): winners are neve
 
 **The defence, in two parts:**
 
-1. **A hard rate cap, not a score ceiling.** An earlier draft set a score ceiling of 4,200 and it was worthless: the scoring curve's asymptote was 4,040, so nothing could ever exceed it and the check caught nothing. Soft saturation also compresses cheating — a script at 200 taps/s scored only 18% above an elite human — which is good for fairness but means **score alone cannot detect a cheat**. The engine now caps the effective rate at 20 taps/s (`R_HARD_CAP_PER_SEC`), above any sustained human rate even with four fingers. Everyone above it scores exactly 5,732, so a script gains nothing, and no genuine player is ever falsely accused.
+1. **A hard rate cap, not a score ceiling.** An earlier draft set a score ceiling of 4,200 and it was worthless: the scoring curve's asymptote was 4,040, so nothing could ever exceed it and the check caught nothing. Soft saturation also compresses cheating — a script at 200 taps/s scored only 18% above an elite human — which is good for fairness but means **score alone cannot detect a cheat**. The engine caps the effective rate at **30** taps/s (`R_HARD_CAP_PER_SEC`). The cap was briefly set to 20, which was wrong for the reason this very section gives: at 20 a four-finger player and a script both score 5,732, reintroducing a tie at exactly the leaderboard positions carrying prize money. Five fingers reaches about 25/s, so 30 sits above any human and every real player keeps a distinct score. Scripts tie at 6,098, only 2% above the best plausible human, and are flagged at >18/s regardless.
 2. **Review before announcing.** Sort the final list before publishing to Discord. A fabricated entry sits so far outside the real distribution that it is obvious by eye, and there is no clock pressure while doing it.
 
 Server-side recompute (P1) remains the stronger defence and is worth building if the booth app finishes early. It is no longer required to protect the prize.

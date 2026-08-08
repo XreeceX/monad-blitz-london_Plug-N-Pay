@@ -433,7 +433,7 @@ Priority split (corrected — see traceability note below): FR-BOOTH-1/2/4 are *
 | FR-BOOTH-10 | A public leaderboard screen MUST show live standings at the booth, legible across a busy room, updating at least every 5 s. | S | D |
 | FR-BOOTH-11 | The public screen MUST seal 10 s before the contest closes, showing an unambiguous sealed state rather than merely freezing, so a stale screen cannot be mistaken for a live one. | S | D |
 | FR-BOOTH-12 | Final standings MUST be reviewed before publication and revealed after the event, not at the venue. | M | I |
-| FR-BOOTH-13 | The engine MUST cap the effective tap rate at 20/s. Above that everyone scores identically, so scripting gains nothing and no genuine player is falsely accused. The earlier score ceiling of 4,200 sat above the curve's own asymptote of 4,040 and caught nothing. | M | T |
+| FR-BOOTH-13 | The engine MUST cap the effective tap rate at **30/s** — above any human rate, since five fingers reaches about 25/s. The cap MUST NOT sit inside the human range: at 20/s a four-finger player and a script both score 5,732, which reintroduces a tie at the prize-winning positions that soft saturation exists to prevent. An earlier score ceiling of 4,200 was also useless, sitting above the curve's own asymptote of 4,040. | M | T |
 | FR-BOOTH-14 | The app MUST accept up to 5 concurrent pointers and MUST state in its instructions that multiple fingers are allowed. Three fingers reaches 12–15 taps/s; silently discarding a third finger would penalise the best players with nothing on screen explaining why. | M | D |
 | FR-BOOTH-15 | Each booth session MUST settle on a **6-second** interval, phase-staggered per player (`offset = index × 6/N`). 60 players at 6 s is 10 tx/s, inside the pessimistic RPC budget (§13.4); unstaggered, the same load arrives as a 60-transaction spike every 6 s. | M | T |
 | FR-BOOTH-16 | Session opens MUST complete during the join window, before the round starts, and the final settlement MUST also serve as the close. Otherwise 60 opens and 60 closes add roughly 3 tx/s of bursts on top of steady settlement. | M | T |
@@ -518,7 +518,7 @@ Defined in `2026-08-08-booth-frontend-design.md` §8. System-level obligations:
 
 | ID | Requirement | Target | Ver |
 |---|---|---|---|
-| NFR-P-1 | Settlement cadence per session | 1 Hz, configurable | D |
+| NFR-P-1 | Settlement cadence per session | **1 Hz for simulated sessions (M6) — this is the product claim.** Booth sessions (M8) settle at 6 s, because 60 of them at 1 Hz would need 60 tx/s. The two never run at full load together: UC-10 ramps simulated sessions down as phones connect, so the budget carries either ~10 simulated at 1 Hz or 60 phones at 6 s, not both | D |
 | NFR-P-2 | Concurrent sessions sustained during the demo | **60 live**, the whole room, at a 6-second settlement interval = 10 tx/s. Reached by lowering cadence rather than capping players; at 1 Hz the same 60 sessions need 60 tx/s and are impossible | D |
 | NFR-P-3 | Settlement visible on the wall after landing | ≤ 1 s | D |
 | NFR-P-4 | Dashboard frame rate at target concurrency | Readable, no visible stutter | D |
