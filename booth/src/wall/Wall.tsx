@@ -5,10 +5,37 @@
 // is labelled, never disguised).
 
 import { useEffect, useRef, useState } from 'react'
+import QRCode from 'qrcode'
 import { getLeaderboard, getWall, type LeaderboardEntry, type WallData } from '../net/relay'
 import { fmtWh } from '../components/Counter'
 
 const SEAL_KEY = 'pnp.wall.sealed'
+
+// The join URL players scan. Override with VITE_PUBLIC_URL once deployed;
+// otherwise it is this page's own origin, so opening the wall via the LAN IP
+// gives phones a scannable address automatically.
+const JOIN_URL =
+  (import.meta.env.VITE_PUBLIC_URL as string | undefined) ??
+  `${window.location.origin}${window.location.pathname}`
+
+function JoinQr() {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  useEffect(() => {
+    if (!canvasRef.current) return
+    void QRCode.toCanvas(canvasRef.current, JOIN_URL, {
+      width: 232,
+      margin: 2,
+      color: { dark: '#06090C', light: '#DFE9ED' },
+    })
+  }, [])
+  return (
+    <div className="wall-qr">
+      <canvas ref={canvasRef} />
+      <span className="label">SCAN TO PLAY</span>
+      <span className="num wall-qr-url">{JOIN_URL.replace(/^https?:\/\//, '')}</span>
+    </div>
+  )
+}
 
 export function Wall() {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([])
@@ -118,6 +145,7 @@ export function Wall() {
         </ol>
 
         <aside className="wall-side">
+          <JoinQr />
           <div className="wall-stat">
             <span className="num wall-stat-value">{wall?.count ?? 0}</span>
             <span className="label">CARS LIVE NOW</span>

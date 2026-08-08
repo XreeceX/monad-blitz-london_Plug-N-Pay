@@ -584,6 +584,18 @@
 
 .wall-side { display: flex; flex-direction: column; gap: 26px; }
 
+.wall-qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.wall-qr canvas { border-radius: 2px; }
+.wall-qr-url { font-size: 13px; color: var(--cyan); word-break: break-all; text-align: center; }
+
 .wall-stat { display: flex; flex-direction: column; gap: 4px; }
 .wall-stat-value { font-size: 44px; font-weight: 650; color: var(--cyan); line-height: 1; }
 
