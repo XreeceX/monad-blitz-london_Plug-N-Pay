@@ -22,6 +22,7 @@ export interface LeaderboardEntry {
   nick: string
   score: number
   carName?: string
+  deviceId?: string
 }
 
 export interface EndResult {

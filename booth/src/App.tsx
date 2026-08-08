@@ -214,7 +214,10 @@ export default function App() {
       {state.screen === 'leaderboard' && (
         <Leaderboard
           nickname={state.nickname}
+          deviceId={state.deviceId}
           bestScore={state.bestScore}
+          roomId={roomId}
+          myRank={state.lastRun?.rank ?? null}
           cachedTop={state.lastRun?.top ?? null}
           onBack={() =>
             dispatch({ type: 'go', screen: state.lastRun ? 'results' : 'garage' })

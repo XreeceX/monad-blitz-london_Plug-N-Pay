@@ -24,7 +24,11 @@ export function Results({ car, deviceId, result, bestScore, onLeaderboard }: Pro
         <span className="num score-value">{result.score.toLocaleString('en-GB')}</span>
         <span className="label">SCORE{result.score >= bestScore ? ' · PERSONAL BEST' : ''}</span>
         {result.rank !== null && (
-          <span className="rank-line num">RANK #{result.rank}</span>
+          <span className={`rank-line num${result.rank <= 3 ? ` rank-podium rank-${result.rank}` : ''}`}>
+            {result.rank === 1 ? '🥇 ' : result.rank === 2 ? '🥈 ' : result.rank === 3 ? '🥉 ' : ''}
+            RANK #{result.rank}
+            {result.rank === 1 ? ' · CHAMPION' : result.rank <= 3 ? ' · PODIUM' : result.rank <= 10 ? ' · TOP 10' : ''}
+          </span>
         )}
       </div>
 

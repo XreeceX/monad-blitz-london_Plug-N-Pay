@@ -1,8 +1,6 @@
 // The public leaderboard screen — booth spec §3.8, FR-BOOTH-10/11/12.
-// Runs on the booth's big screen (open the app with #wall). Legible across a
-// busy room, updates every few seconds, and the seal state is unambiguous —
-// a stale screen must never pass for a live one (NFR-R-3: degraded operation
-// is labelled, never disguised).
+// Same room-scoped /api/leaderboard as player phones, so ranks stay consistent.
+// Top 3 celebrate; top 10 highlighted. No prize/reward copy.
 
 import { useEffect, useRef, useState } from 'react'
 import QRCode from 'qrcode'
@@ -10,10 +8,8 @@ import { getLeaderboard, getWall, type LeaderboardEntry, type WallData } from '.
 import { fmtWh } from '../components/Counter'
 
 const SEAL_KEY = 'pnp.wall.sealed'
+const MEDAL = ['🥇', '🥈', '🥉'] as const
 
-// The join URL players scan. Override with VITE_PUBLIC_URL once deployed;
-// otherwise it is this page's own origin, so opening the wall via the LAN IP
-// gives phones a scannable address automatically.
 const JOIN_URL =
   (import.meta.env.VITE_PUBLIC_URL as string | undefined) ??
   `${window.location.origin}${window.location.pathname}`
@@ -37,6 +33,14 @@ function JoinQr() {
   )
 }
 
+function wallRowClass(r: LeaderboardEntry) {
+  const bits = ['wall-row', 'wall-top10']
+  if (r.rank === 1) bits.push('wall-gold')
+  else if (r.rank === 2) bits.push('wall-silver')
+  else if (r.rank === 3) bits.push('wall-bronze')
+  return bits.join(' ')
+}
+
 export function Wall() {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([])
   const [wall, setWall] = useState<WallData | null>(null)
@@ -47,7 +51,6 @@ export function Wall() {
 
   useEffect(() => {
     let dead = false
-
     const roomQ = new URLSearchParams(window.location.search).get('room')
 
     async function pollWall() {
@@ -80,7 +83,6 @@ export function Wall() {
     }
   }, [])
 
-  // Host control: press S twice within 3s to seal (FR-BOOTH-11).
   useEffect(() => {
     let armTimer: ReturnType<typeof setTimeout> | null = null
     function onKey(e: KeyboardEvent) {
@@ -104,13 +106,12 @@ export function Wall() {
     return (
       <div className="wall wall-sealed">
         <p className="seal-title">FINAL STANDINGS SEALED</p>
-        <p className="seal-sub">
-          Winners are reviewed by the team and revealed in Discord after the event.
-          Your own score stays on your own phone.
-        </p>
+        <p className="seal-sub">Your own score stays on your own phone.</p>
       </div>
     )
   }
+
+  const champion = entries.find((e) => e.rank === 1) ?? null
 
   return (
     <div className="wall">
@@ -129,6 +130,19 @@ export function Wall() {
         </div>
       </header>
 
+      {champion && (
+        <div className="wall-champ">
+          <span className="wall-champ-medal" aria-hidden>
+            🥇
+          </span>
+          <div className="wall-champ-copy">
+            <p className="label">Leader</p>
+            <p className="num wall-champ-nick">{champion.nick}</p>
+          </div>
+          <p className="num wall-champ-score">{champion.score.toLocaleString('en-GB')}</p>
+        </div>
+      )}
+
       <div className="wall-body">
         <ol className="wall-list">
           {entries.length === 0 && (
@@ -137,8 +151,10 @@ export function Wall() {
             </li>
           )}
           {entries.slice(0, 10).map((r) => (
-            <li key={`${r.rank}-${r.nick}`} className="wall-row">
-              <span className="num wall-rank">{r.rank}</span>
+            <li key={`${r.rank}-${r.deviceId ?? r.nick}`} className={wallRowClass(r)}>
+              <span className="num wall-rank" aria-label={`Rank ${r.rank}`}>
+                {r.rank <= 3 ? MEDAL[r.rank - 1] : r.rank}
+              </span>
               <span className="num wall-nick">{r.nick}</span>
               {r.carName && <span className="wall-car label">{r.carName}</span>}
               <span className="num wall-score">{r.score.toLocaleString('en-GB')}</span>
@@ -159,13 +175,6 @@ export function Wall() {
           <div className="wall-stat">
             <span className="num wall-stat-value">{fmtWh(wall?.totalWh ?? 0)}</span>
             <span className="label">TOTAL Wh MOVED</span>
-          </div>
-          <div className="wall-terms">
-            <p className="label">REWARD</p>
-            <p>
-              Top 10 share 20% of any cash prize the team wins — nothing if the team
-              doesn't place. Best run counts.
-            </p>
           </div>
         </aside>
       </div>

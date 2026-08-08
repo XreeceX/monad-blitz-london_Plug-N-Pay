@@ -128,10 +128,7 @@ export function Waiting({ roomId, deviceId, nickname, car, onStart, onLeave }: P
         </>
       )}
 
-      <p className="waiting-terms muted">
-        Top 10 share 20% of any cash prize we win — nothing if we don't place. Multiple
-        fingers are allowed. One round.
-      </p>
+      <p className="waiting-terms muted">Multiple fingers are allowed. One round.</p>
     </div>
   )
 }

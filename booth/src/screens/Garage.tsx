@@ -313,10 +313,7 @@ export function Garage({ car, nickname, onPlugged }: Props) {
         </div>
       )}
 
-      <p className="garage-terms garage-chrome">
-        Top 10 share 20% of any cash prize we win — nothing if we don't place. Full
-        terms on the leaderboard. Multiple fingers are allowed.
-      </p>
+      <p className="garage-terms garage-chrome">Multiple fingers are allowed. One round.</p>
     </div>
   )
 }
