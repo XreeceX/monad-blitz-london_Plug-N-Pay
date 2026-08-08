@@ -29,17 +29,24 @@ export function Results({ car, deviceId, result, bestScore, onAgain, onLeaderboa
         )}
       </div>
 
+      {/* Charged and paid are the headline; V2G is an added bonus below. */}
       <div className="results-grid hairline-top">
         <Counter value={fmtWh(result.whCharged)} unit="Wh" label="CHARGED" />
-        <Counter value={fmtWh(result.whDischarged)} unit="Wh" label="SOLD BACK" />
         <Counter value={fmtMon(result.monPaid)} unit="MON" label="PAID" />
-        <Counter value={fmtMon(result.monEarned)} unit="MON" label="EARNED" />
       </div>
 
       {result.flipped ? (
-        <p className="flip-note">You reached the Flip — the car sold energy back to the grid.</p>
+        <div className="bonus-row">
+          <span className="label">V2G BONUS</span>
+          <span className="num">
+            +{fmtMon(result.monEarned)} MON · {fmtWh(result.whDischarged)} Wh sold back
+          </span>
+        </div>
       ) : (
-        <p className="flip-note muted">Fill the battery to 100% to flip into sell-back mode.</p>
+        <p className="flip-note muted">
+          Bonus missed — fill the battery to 100% before time runs out to sell back to
+          the grid.
+        </p>
       )}
 
       <div className="plate-chip num results-plate">

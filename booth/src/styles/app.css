@@ -467,6 +467,17 @@
 .flip-note { font-size: 13px; text-align: center; color: var(--cyan); }
 .flip-note.muted { color: var(--muted); }
 
+.bonus-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--cyan-dim);
+  border-radius: var(--radius);
+  color: var(--cyan);
+}
+
 .results-plate { align-self: center; }
 
 .results-actions {

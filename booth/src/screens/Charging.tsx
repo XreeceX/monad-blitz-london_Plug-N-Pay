@@ -148,12 +148,14 @@ export function Charging({ car, session, onEnd }: Props) {
       if (endedRef.current) return
       const s: EngineSnapshot = engine.update(now)
 
-      // hero: Wh while paying, MON earned after the Flip (§3.5)
+      // Energy stays the hero throughout — charged-and-paid is the story,
+      // V2G is an added bonus (team decision 2026-08-08, supersedes §3.6's
+      // hero swap). After the Flip the hero keeps climbing as total Wh moved.
       if (heroRef.current && monRef.current && heroLabelRef.current) {
         if (s.phase === 'v2g') {
-          heroRef.current.textContent = fmtMon(s.monEarned)
-          heroLabelRef.current.textContent = 'MON EARNED'
-          monRef.current.textContent = `${fmtWh(s.whDischarged)} Wh SOLD BACK`
+          heroRef.current.textContent = fmtWh(s.whCharged + s.whDischarged)
+          heroLabelRef.current.textContent = 'Wh MOVED'
+          monRef.current.textContent = `−${fmtMon(s.monPaid)} MON · BONUS +${fmtMon(s.monEarned)}`
         } else {
           heroRef.current.textContent = fmtWh(s.whCharged)
           heroLabelRef.current.textContent = 'Wh DELIVERED'
@@ -186,9 +188,9 @@ export function Charging({ car, session, onEnd }: Props) {
         setPhase('v2g')
       }
 
-      // final 5s countdown stamps
+      // final 3s countdown stamps (a 5s countdown is a third of a 15s round)
       const remaining = Math.ceil((SESSION_MS - s.t) / 1000)
-      if (remaining <= 5 && remaining >= 1 && remaining !== lastCountdown) {
+      if (remaining <= 3 && remaining >= 1 && remaining !== lastCountdown) {
         lastCountdown = remaining
         const el = countdownRef.current
         if (el) {
@@ -248,7 +250,7 @@ export function Charging({ car, session, onEnd }: Props) {
           −0.0000 MON
         </span>
         <span className="phase-chip label" data-role="phase">
-          {phase === 'v2g' ? 'EARNING · V2G SELL-BACK' : 'PAYING · GRID → CAR'}
+          {phase === 'v2g' ? 'BONUS · SELLING BACK TO GRID' : 'PAYING · GRID → CAR'}
         </span>
       </header>
 
