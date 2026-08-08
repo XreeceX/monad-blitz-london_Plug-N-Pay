@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Car } from '../components/Car'
-import { getRoom, joinRoom, type RoomState } from '../net/room'
+import { getRoom, joinRoom } from '../net/room'
 import type { CarSpec } from '../game/cars'
 
 interface Props {
@@ -11,16 +11,21 @@ interface Props {
   nickname: string
   car: CarSpec
   onStart: () => void
+  onLeave: () => void
 }
 
-export function Waiting({ roomId, deviceId, nickname, car, onStart }: Props) {
-  const [room, setRoom] = useState<RoomState | null>(null)
+export function Waiting({ roomId, deviceId, nickname, car, onStart, onLeave }: Props) {
+  const [count, setCount] = useState<number | null>(null)
   const [failed, setFailed] = useState(false)
+  const [locked, setLocked] = useState(false)
+  const [lockReason, setLockReason] = useState('Host closed this room — joins are locked.')
   const fired = useRef(false)
+  const admitted = useRef(false)
 
   useEffect(() => {
     let dead = false
     fired.current = false
+    admitted.current = false
 
     async function tick() {
       const joined = await joinRoom(roomId, {
@@ -30,17 +35,48 @@ export function Waiting({ roomId, deviceId, nickname, car, onStart }: Props) {
         carName: car.name,
         hue: car.hue,
       })
-      const r = joined ?? (await getRoom(roomId))
+      if (dead) return
+
+      if (joined) {
+        admitted.current = true
+        setFailed(false)
+        setLocked(false)
+        setCount(joined.count)
+        if (joined.status === 'live' && !fired.current) {
+          fired.current = true
+          onStart()
+        }
+        return
+      }
+
+      const r = await getRoom(roomId)
       if (dead) return
       if (!r) {
         setFailed(true)
+        setLocked(false)
         return
       }
+
       setFailed(false)
-      setRoom(r)
-      if (r.status === 'live' && !fired.current) {
-        fired.current = true
-        onStart()
+      setCount(r.count)
+
+      if (r.status === 'closed' || r.status === 'ended') {
+        setLockReason('Host closed this room — joins are locked. Ask them to open a new lobby.')
+        setLocked(true)
+        return
+      }
+
+      const inRoster = r.players.some((p) => p.deviceId === deviceId)
+      if (r.status === 'live') {
+        if ((admitted.current || inRoster) && !fired.current) {
+          fired.current = true
+          onStart()
+          return
+        }
+        if (!admitted.current && !inRoster) {
+          setLockReason('Round already started — this room is locked.')
+          setLocked(true)
+        }
       }
     }
 
@@ -65,9 +101,21 @@ export function Waiting({ roomId, deviceId, nickname, car, onStart }: Props) {
       </p>
 
       {failed ? (
-        <p className="landing-error">
-          Room not found — check the code or ask the host to open a new one.
-        </p>
+        <>
+          <p className="landing-error">
+            Room not found — check the code or ask the host to open a new one.
+          </p>
+          <button className="primary" onClick={onLeave}>
+            Back to start
+          </button>
+        </>
+      ) : locked ? (
+        <>
+          <p className="landing-error">{lockReason}</p>
+          <button className="primary" onClick={onLeave}>
+            Back to start
+          </button>
+        </>
       ) : (
         <>
           <p className="waiting-status">
@@ -76,7 +124,7 @@ export function Waiting({ roomId, deviceId, nickname, car, onStart }: Props) {
               …
             </span>
           </p>
-          <p className="num waiting-count">{room?.count ?? '—'} in the lobby</p>
+          <p className="num waiting-count">{count ?? '—'} in the lobby</p>
         </>
       )}
 

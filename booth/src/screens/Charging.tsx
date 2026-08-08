@@ -45,7 +45,6 @@ export function Charging({ car, session, onEnd }: Props) {
   const countdownRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
   const cablePathRef = useRef<SVGPathElement>(null)
-  const tapZoneRef = useRef<HTMLDivElement>(null)
 
   const endedRef = useRef(false)
   const onEndRef = useRef(onEnd)
@@ -55,8 +54,7 @@ export function Charging({ car, session, onEnd }: Props) {
     const root = rootRef.current
     const svg = svgRef.current
     const cablePath = cablePathRef.current
-    const tapZone = tapZoneRef.current
-    if (!root || !svg || !cablePath || !tapZone) return
+    if (!root || !svg || !cablePath) return
 
     const engine = createEngine(performance.now(), session?.surgeWindows)
 
@@ -90,19 +88,28 @@ export function Charging({ car, session, onEnd }: Props) {
     const stream = new PipStream(cablePath, pipEls)
     stream.speedPerSec = 0.9
 
-    // ---- input: pointerdown only, up to 5 concurrent pointers ----
+    // ---- input: whole screen is the tap pad (multi-touch, up to 5) ----
     const pointers = new Set<number>()
     const ripples = Array.from(root.querySelectorAll<HTMLDivElement>('.ripple'))
     let rippleIdx = 0
 
     function onDown(e: PointerEvent) {
       if (endedRef.current) return
+      // Ignore secondary buttons; every finger counts.
+      if (e.pointerType === 'mouse' && e.button !== 0) return
+      e.preventDefault()
+      if (pointers.has(e.pointerId)) return
+      if (pointers.size >= MAX_POINTERS) return
       pointers.add(e.pointerId)
-      if (pointers.size > MAX_POINTERS) return
+      try {
+        root.setPointerCapture(e.pointerId)
+      } catch {
+        /* ignore */
+      }
       engine.tap(e.timeStamp || performance.now())
       const rp = ripples[rippleIdx++ % RIPPLE_POOL]
-      if (rp && tapZone) {
-        const r = tapZone.getBoundingClientRect()
+      if (rp) {
+        const r = root.getBoundingClientRect()
         rp.style.left = `${e.clientX - r.left}px`
         rp.style.top = `${e.clientY - r.top}px`
         rp.classList.remove('rippling')
@@ -113,9 +120,13 @@ export function Charging({ car, session, onEnd }: Props) {
     function onUp(e: PointerEvent) {
       pointers.delete(e.pointerId)
     }
-    tapZone.addEventListener('pointerdown', onDown)
-    tapZone.addEventListener('pointerup', onUp)
-    tapZone.addEventListener('pointercancel', onUp)
+    const opts: AddEventListenerOptions = { passive: false }
+    root.addEventListener('pointerdown', onDown, opts)
+    root.addEventListener('pointerup', onUp, opts)
+    root.addEventListener('pointercancel', onUp, opts)
+    const blockGesture = (ev: Event) => ev.preventDefault()
+    // Stop iOS from treating multi-finger taps as page gestures.
+    root.addEventListener('gesturestart', blockGesture, opts)
 
     // ---- wake lock (§11): request now, reacquire on visibility ----
     let lock: WakeLockSentinel | null = null
@@ -223,9 +234,10 @@ export function Charging({ car, session, onEnd }: Props) {
     return () => {
       stop()
       clearInterval(tickTimer)
-      tapZone.removeEventListener('pointerdown', onDown)
-      tapZone.removeEventListener('pointerup', onUp)
-      tapZone.removeEventListener('pointercancel', onUp)
+      root.removeEventListener('pointerdown', onDown)
+      root.removeEventListener('pointerup', onUp)
+      root.removeEventListener('pointercancel', onUp)
+      root.removeEventListener('gesturestart', blockGesture)
       document.removeEventListener('visibilitychange', onVis)
       lock?.release().catch(() => {})
     }
@@ -237,6 +249,12 @@ export function Charging({ car, session, onEnd }: Props) {
       {flash && <div className="flip-flash" aria-hidden />}
       <div ref={surgeRef} className="surge-vignette" aria-hidden>
         <span className="surge-stamp num">GRID SURGE ×2</span>
+      </div>
+
+      <div className="tap-layer" aria-hidden>
+        {Array.from({ length: RIPPLE_POOL }, (_, i) => (
+          <div key={i} className="ripple" />
+        ))}
       </div>
 
       <header className="charging-head">
@@ -280,12 +298,7 @@ export function Charging({ car, session, onEnd }: Props) {
         <span className="label pmax-note num">MAX {P_MAX_KW} kW · TAPER AT 80%</span>
       </div>
 
-      <div ref={tapZoneRef} className="tap-zone hairline-top">
-        {Array.from({ length: RIPPLE_POOL }, (_, i) => (
-          <div key={i} className="ripple" aria-hidden />
-        ))}
-        <span className="tap-hint label">TAP — UP TO FIVE FINGERS COUNT</span>
-      </div>
+      <p className="tap-hint label">TAP ANYWHERE — UP TO FIVE FINGERS COUNT</p>
 
       <div ref={countdownRef} className="countdown num" aria-hidden />
     </div>

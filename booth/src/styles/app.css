@@ -16,32 +16,90 @@
 /* ---------- landing / host / waiting ---------- */
 
 .landing {
-  padding: calc(env(safe-area-inset-top, 0px) + 48px) 16px 28px;
-  gap: 36px;
-  justify-content: space-between;
+  padding: calc(env(safe-area-inset-top, 0px) + 24px) 24px
+    calc(env(safe-area-inset-bottom, 0px) + 28px);
+  justify-content: center;
+  align-items: center;
+  gap: 0;
+  position: relative;
+  overflow: hidden;
 }
 
-.landing-brand { display: flex; flex-direction: column; gap: 8px; }
-.landing-title {
-  font-size: 34px;
-  font-weight: 700;
-  letter-spacing: 0.36px;
-  line-height: 1.1;
+.landing-glow {
+  position: absolute;
+  inset: -20% -10% auto;
+  height: 70%;
+  background:
+    radial-gradient(ellipse 60% 50% at 50% 40%, rgba(10, 132, 255, 0.18), transparent 70%),
+    radial-gradient(ellipse 40% 30% at 50% 55%, rgba(255, 255, 255, 0.04), transparent 70%);
+  pointer-events: none;
+  animation: landing-breathe 6s ease-in-out infinite;
 }
-.landing-tag { color: var(--muted); font-size: 17px; letter-spacing: -0.4px; }
 
-.landing-actions {
+@keyframes landing-breathe {
+  0%, 100% { opacity: 0.75; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.04); }
+}
+
+.landing-center {
+  position: relative;
+  z-index: 1;
+  width: min(420px, 100%);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  align-items: center;
+  text-align: center;
+  gap: 14px;
 }
 
-.landing-host { width: 100%; }
-.landing-host-hint { text-align: center; line-height: 1.4; font-size: 13px; letter-spacing: -0.08px; }
+.landing-eyebrow {
+  margin-bottom: 4px;
+  color: var(--muted);
+}
+
+.landing-title {
+  font-size: clamp(40px, 9vw, 56px);
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  line-height: 1.05;
+  margin: 0;
+}
+
+.landing-tag {
+  color: var(--muted);
+  font-size: 17px;
+  letter-spacing: -0.4px;
+  line-height: 1.35;
+  max-width: 28ch;
+  margin: 0 0 18px;
+}
+
+.landing-host {
+  width: 100%;
+  max-width: 320px;
+  animation: landing-cta-in 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes landing-cta-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.landing-host-hint {
+  margin-top: 4px;
+  max-width: 34ch;
+  text-align: center;
+  line-height: 1.45;
+  font-size: 13px;
+  letter-spacing: -0.08px;
+  color: var(--muted-3);
+}
+
 .landing-error {
   color: var(--danger);
   font-size: 13px;
   text-align: center;
+  margin-top: 4px;
 }
 
 .host-lobby {
@@ -265,7 +323,17 @@
 
 /* ---------- garage (§3.3) ---------- */
 
-.garage { touch-action: none; }
+.garage {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.garage-chrome {
+  position: relative;
+  z-index: 2;
+  pointer-events: none;
+}
 
 .garage-head {
   display: flex;
@@ -293,7 +361,15 @@
   flex: 1;
   width: 100%;
   touch-action: none;
+  z-index: 1;
 }
+
+.connector-g { cursor: grab; }
+.holding .connector-g { cursor: grabbing; }
+.connector-glow {
+  transition: opacity 160ms ease;
+}
+.holding .connector-glow { opacity: 0.28; }
 
 .cable { will-change: d; }
 
@@ -366,6 +442,7 @@
   color: var(--muted);
   text-align: center;
   border-top: 1px solid var(--line);
+  pointer-events: none;
 }
 
 /* ---------- handshake (§3.4) ---------- */
@@ -415,7 +492,13 @@
 
 /* ---------- charging (§3.5) ---------- */
 
-.charging { touch-action: none; }
+.charging {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  position: fixed;
+  overflow: hidden;
+}
 
 .charging-head {
   display: flex;
@@ -423,6 +506,9 @@
   align-items: flex-start;
   gap: 2px;
   padding: 10px 20px 12px;
+  pointer-events: none;
+  position: relative;
+  z-index: 2;
 }
 
 .hero-value {
@@ -455,6 +541,8 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
+  pointer-events: none;
+  z-index: 1;
 }
 
 .charging-svg { flex: 1; width: 100%; min-height: 0; }
@@ -497,37 +585,37 @@
 
 .pmax-note { padding: 4px 20px 8px; }
 
-.tap-zone {
-  position: relative;
-  height: 40%;
-  flex: none;
-  touch-action: none;
+.tap-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
   overflow: hidden;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
 }
 
 .tap-hint {
-  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  padding: 12px 16px calc(env(safe-area-inset-bottom, 0px) + 16px);
   pointer-events: none;
   color: var(--cyan-dim);
 }
 
 .ripple {
   position: absolute;
-  width: 72px;
-  height: 72px;
-  margin: -36px 0 0 -36px;
-  border: 1.5px solid var(--cyan);
+  width: 88px;
+  height: 88px;
+  margin: -44px 0 0 -44px;
+  border: 2px solid var(--cyan);
   border-radius: 50%;
   opacity: 0;
   pointer-events: none;
 }
 .ripple.rippling { animation: ripple-out 420ms ease-out 1; }
 @keyframes ripple-out {
-  from { opacity: 0.7; transform: scale(0.25); }
-  to { opacity: 0; transform: scale(1); }
+  from { opacity: 0.75; transform: scale(0.2); }
+  to { opacity: 0; transform: scale(1.15); }
 }
 
 /* surge (§3.5) — luminance, not a second hue (§10) */
@@ -731,6 +819,19 @@
 }
 
 .lb-back { margin-top: auto; }
+
+.lb-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: auto;
+}
+.lb-actions .lb-back {
+  margin-top: 0;
+  background: transparent;
+  color: var(--muted);
+  min-height: 44px;
+}
 
 /* ---------- wall (§3.8) ---------- */
 

@@ -82,14 +82,20 @@ export default function App() {
   }, [])
 
   const leaveRoom = useCallback(() => {
+    if (roomId) sessionStorage.removeItem(`pnp.host.${roomId}`)
     setRoomId(null)
     setHostToken(null)
+    setSession(null)
     const url = new URL(window.location.href)
     url.searchParams.delete('room')
     url.hash = ''
     window.history.replaceState(null, '', url.toString())
     setMode('landing')
-  }, [])
+  }, [roomId])
+
+  const closeGame = useCallback(() => {
+    leaveRoom()
+  }, [leaveRoom])
 
   const onPlugged = useCallback(() => {
     sessionRef.current = startSession(state.deviceId, state.nickname, state.car.id, roomId)
@@ -172,6 +178,7 @@ export default function App() {
           nickname={state.nickname}
           car={state.car}
           onStart={enterPlay}
+          onLeave={leaveRoom}
         />
       </>
     )
@@ -212,6 +219,7 @@ export default function App() {
           onBack={() =>
             dispatch({ type: 'go', screen: state.lastRun ? 'results' : 'garage' })
           }
+          onCloseGame={closeGame}
         />
       )}
     </>

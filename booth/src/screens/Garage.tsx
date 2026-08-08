@@ -1,7 +1,6 @@
-// Garage and swipe-to-plug — booth spec §3.3.
-// The only gesture in the app. Cable control points lag the drag with damped
-// follow; a magnet inside 90px of the port forgives fat thumbs; a miss falls
-// home on a spring with no error text.
+// Garage and hold-to-drag plug — booth spec §3.3.
+// Must grab the connector, hold, and drag it onto the car port. Misses spring
+// home with no error text. Overlay chrome never steals the gesture.
 
 import { useEffect, useRef, useState } from 'react'
 import { Car, CAR_W, CAR_H, carPortPoint } from '../components/Car'
@@ -17,14 +16,15 @@ interface Props {
   onPlugged: () => void
 }
 
-const MAGNET_PX = 90
-const COMMIT_PX = 60
-const HIT_PX = 96
+const MAGNET_PX = 72
+const COMMIT_PX = 56
+const HIT_PX = 120
 const FOLLOW = 0.18
-const MAGNET_LERP = 0.25
+const MAGNET_LERP = 0.28
 
 export function Garage({ car, nickname, onPlugged }: Props) {
   const [latched, setLatched] = useState(false)
+  const [holding, setHolding] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
   const cableRef = useRef<SVGPathElement>(null)
@@ -45,12 +45,9 @@ export function Garage({ car, nickname, onPlugged }: Props) {
     const h = rootEl.clientHeight
     svgEl.setAttribute('viewBox', `0 0 ${w} ${h}`)
 
-    // Scene geometry. The car fills the upper half inside a marked parking
-    // bay; the post stands bottom-left with the cable rising from its socket;
-    // the connector rests in a holster at bottom-centre, thumb-reachable.
-    const carScale = Math.min(1.35, (h * 0.52) / CAR_H)
+    const carScale = Math.min(1.35, (h * 0.48) / CAR_H)
     const carX = w / 2 - (CAR_W * carScale) / 2
-    const carY = h * 0.06
+    const carY = h * 0.08
     const localPort = carPortPoint(car)
     const port: Pt = { x: carX + localPort.x * carScale, y: carY + localPort.y * carScale }
 
@@ -58,14 +55,13 @@ export function Garage({ car, nickname, onPlugged }: Props) {
     const postX = Math.max(w * 0.2, 56)
     const postG = svgEl.querySelector<SVGGElement>('.garage-post')
     postG?.setAttribute('transform', `translate(${postX}, ${h - 6}) scale(${postScale})`)
-    // the cable leaves the post's socket, not the screen edge
     const station: Pt = { x: postX, y: h - 6 - 24 * postScale }
-    const holster: Pt = { x: w * 0.55, y: h - 150 }
+    // Holster sits clear of the terms strip — thumb reach, centre-bottom.
+    const holster: Pt = { x: w * 0.55, y: h - 168 }
 
     const carG = svgEl.querySelector<SVGGElement>('.garage-car')
     carG?.setAttribute('transform', `translate(${carX}, ${carY}) scale(${carScale})`)
 
-    // parking bay brackets around the car — hairlines do the grouping (§10)
     const bay = svgEl.querySelector<SVGPathElement>('.bay-lines')
     if (bay) {
       const bx = carX - 18
@@ -84,16 +80,16 @@ export function Garage({ car, nickname, onPlugged }: Props) {
       )
     }
 
-    // Mutable gesture state, all outside React.
     const pos = { ...holster }
     const c1 = { x: station.x, y: station.y - 40 }
     const c2 = { x: holster.x, y: holster.y + 60 }
     let dragging = false
     let pointerId: number | null = null
-    let springT = -1 // >=0 while the miss spring is running
+    let springT = -1
     const springFrom = { ...holster }
     let done = false
-    let pipP = -1 // 0..1 while the first amber pip travels the cable (§3.3)
+    let pipP = -1
+    const target = { ...holster }
 
     const dist = (a: Pt, b: Pt) => Math.hypot(a.x - b.x, a.y - b.y)
 
@@ -102,22 +98,22 @@ export function Garage({ car, nickname, onPlugged }: Props) {
       return { x: e.clientX - r.left, y: e.clientY - r.top }
     }
 
-    const target = { ...holster }
-
     function latch() {
+      if (done) return
       done = true
       dragging = false
+      pointerId = null
+      setHolding(false)
       pos.x = port.x
       pos.y = port.y
       setLatched(true)
-      // Latch payoff timeline (§3.3)
-      unlockAudio() // this gesture is what unlocks the AudioContext
+      unlockAudio()
       setTimeout(() => {
         carG?.classList.add('chassis-dip')
       }, 80)
       setTimeout(() => {
         thunk()
-        navigator.vibrate?.(12) // Android-only bonus; expected no-op on iOS
+        navigator.vibrate?.(12)
       }, 100)
       setTimeout(() => {
         ringRef.current?.classList.add('flare')
@@ -131,18 +127,29 @@ export function Garage({ car, nickname, onPlugged }: Props) {
 
     function down(e: PointerEvent) {
       if (done || dragging) return
+      // Only the plug is grabable — tapping elsewhere does nothing.
       const p = toSvg(e)
       if (dist(p, pos) > HIT_PX) return
+      e.preventDefault()
       dragging = true
       pointerId = e.pointerId
       springT = -1
-      svgEl.setPointerCapture(e.pointerId)
+      setHolding(true)
+      try {
+        rootEl.setPointerCapture(e.pointerId)
+      } catch {
+        /* ignore */
+      }
       target.x = p.x
       target.y = p.y
+      // Snap plug under the thumb immediately so the hold feels physical.
+      pos.x = p.x
+      pos.y = p.y
     }
 
     function move(e: PointerEvent) {
       if (!dragging || e.pointerId !== pointerId) return
+      e.preventDefault()
       const p = toSvg(e)
       target.x = p.x
       target.y = p.y
@@ -152,42 +159,47 @@ export function Garage({ car, nickname, onPlugged }: Props) {
       if (!dragging || e.pointerId !== pointerId) return
       dragging = false
       pointerId = null
-      if (dist(pos, port) <= COMMIT_PX) {
+      setHolding(false)
+      try {
+        rootEl.releasePointerCapture(e.pointerId)
+      } catch {
+        /* ignore */
+      }
+      // Must release on (or very near) the port — no auto-snap mid-drag.
+      if (dist(pos, port) <= COMMIT_PX || dist(target, port) <= COMMIT_PX) {
         latch()
       } else {
-        // miss: gravity spring home, one bounce, no error text
         springT = 0
         springFrom.x = pos.x
         springFrom.y = pos.y
         ringRef.current?.classList.remove('flare')
         const portG = svgEl.querySelector('.garage-port-ring')
         portG?.classList.remove('not-yet')
-        // force reflow so the pulse can replay
         void (portG as SVGElement | null)?.getBoundingClientRect()
         portG?.classList.add('not-yet')
       }
     }
 
-    svgEl.addEventListener('pointerdown', down)
-    svgEl.addEventListener('pointermove', move)
-    svgEl.addEventListener('pointerup', up)
-    svgEl.addEventListener('pointercancel', up)
+    const opts: AddEventListenerOptions = { passive: false }
+    rootEl.addEventListener('pointerdown', down, opts)
+    rootEl.addEventListener('pointermove', move, opts)
+    rootEl.addEventListener('pointerup', up, opts)
+    rootEl.addEventListener('pointercancel', up, opts)
 
     const stop = onFrame((_, dtMs) => {
       const dt = Math.min(dtMs, 50) / 16.7
 
       if (dragging) {
-        // magnet: align and pull inside MAGNET_PX
+        // Soft magnet assists aim near the port, but never finishes the latch.
         if (dist(target, port) < MAGNET_PX) {
-          pos.x += (port.x - pos.x) * MAGNET_LERP * dt
-          pos.y += (port.y - pos.y) * MAGNET_LERP * dt
+          const pull = { x: target.x + (port.x - target.x) * 0.45, y: target.y + (port.y - target.y) * 0.45 }
+          pos.x += (pull.x - pos.x) * MAGNET_LERP * dt
+          pos.y += (pull.y - pos.y) * MAGNET_LERP * dt
         } else {
-          pos.x += (target.x - pos.x) * 0.55 * dt
-          pos.y += (target.y - pos.y) * 0.55 * dt
+          pos.x += (target.x - pos.x) * 0.65 * dt
+          pos.y += (target.y - pos.y) * 0.65 * dt
         }
-        if (dist(pos, port) < 12 && dist(target, port) < MAGNET_PX) latch()
       } else if (springT >= 0) {
-        // 550ms fall home with one bounce
         springT += dtMs
         const k = Math.min(springT / 550, 1)
         const ease = 1 - Math.pow(1 - k, 2) * Math.cos(k * Math.PI * 1.5)
@@ -196,7 +208,6 @@ export function Garage({ car, nickname, onPlugged }: Props) {
         if (k >= 1) springT = -1
       }
 
-      // cable: damped control-point follow (§3.3)
       const slack = done ? 24 : Math.max(30, 90 - dist(pos, station) * 0.15)
       const c1t = { x: station.x, y: station.y - slack }
       const c2t = { x: pos.x, y: pos.y + slack }
@@ -207,9 +218,12 @@ export function Garage({ car, nickname, onPlugged }: Props) {
       cable.setAttribute('d', cableD(station, c1, c2, pos))
 
       const angle = done ? Math.atan2(port.y - c2.y, port.x - c2.x) * (180 / Math.PI) + 90 : 0
-      connector.setAttribute('transform', `translate(${pos.x}, ${pos.y}) rotate(${angle})`)
+      const scale = dragging ? 1.12 : 1
+      connector.setAttribute(
+        'transform',
+        `translate(${pos.x}, ${pos.y}) rotate(${angle}) scale(${scale})`,
+      )
 
-      // first amber pip departs along the cable after the latch
       if (pipP >= 0 && pipRef.current) {
         pipP += dtMs / 700
         if (pipP >= 1) {
@@ -228,7 +242,6 @@ export function Garage({ car, nickname, onPlugged }: Props) {
         }
       }
 
-      // the port ring only glows while landable
       ringRef.current?.setAttribute(
         'stroke',
         dragging && dist(pos, port) < MAGNET_PX ? 'var(--cyan)' : 'var(--cyan-dim)',
@@ -237,10 +250,10 @@ export function Garage({ car, nickname, onPlugged }: Props) {
 
     return () => {
       stop()
-      svgEl.removeEventListener('pointerdown', down)
-      svgEl.removeEventListener('pointermove', move)
-      svgEl.removeEventListener('pointerup', up)
-      svgEl.removeEventListener('pointercancel', up)
+      rootEl.removeEventListener('pointerdown', down)
+      rootEl.removeEventListener('pointermove', move)
+      rootEl.removeEventListener('pointerup', up)
+      rootEl.removeEventListener('pointercancel', up)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [car])
@@ -248,8 +261,11 @@ export function Garage({ car, nickname, onPlugged }: Props) {
   const localPort = carPortPoint(car)
 
   return (
-    <div ref={rootRef} className={`screen garage no-touch-ui${latched ? ' latched' : ''}`}>
-      <div className="garage-head">
+    <div
+      ref={rootRef}
+      className={`screen garage no-touch-ui${latched ? ' latched' : ''}${holding ? ' holding' : ''}`}
+    >
+      <div className="garage-head garage-chrome">
         <span className="nick-chip num">{nickname}</span>
         <span className="plate-chip num">
           {car.name} · {car.plateKwh} kWh
@@ -259,7 +275,6 @@ export function Garage({ car, nickname, onPlugged }: Props) {
       <svg ref={svgRef} className="garage-svg connector">
         <path className="bay-lines" fill="none" stroke="var(--line)" strokeWidth={2} />
         <g className="garage-car">
-          {/* Car nested inline so the port ring lives in the same coord space */}
           <Car spec={car} />
           <g className="garage-port-ring" transform={`translate(${localPort.x}, ${localPort.y})`}>
             <circle ref={ringRef} r={9} fill="none" stroke="var(--cyan-dim)" strokeWidth={2.5} />
@@ -275,9 +290,11 @@ export function Garage({ car, nickname, onPlugged }: Props) {
         <circle ref={pipRef} className="pip" r={4} fill="var(--cyan-hot)" opacity={0} />
 
         <g ref={connectorRef} className="connector-g">
-          <rect x={-13} y={-30} width={26} height={40} rx={6} fill="var(--surface)" stroke="var(--cyan-dim)" strokeWidth={2} />
-          <rect x={-6} y={-38} width={12} height={12} rx={3} fill="var(--cyan-dim)" />
-          <circle r={44} fill="transparent" />
+          {/* Invisible fat hit target for thumbs */}
+          <circle className="connector-hit" r={56} fill="transparent" />
+          <circle className="connector-glow" r={28} fill="var(--cyan)" opacity={0.12} />
+          <rect x={-14} y={-32} width={28} height={44} rx={7} fill="var(--surface)" stroke="var(--cyan)" strokeWidth={2.5} />
+          <rect x={-7} y={-40} width={14} height={14} rx={3} fill="var(--cyan)" />
         </g>
       </svg>
 
@@ -290,12 +307,13 @@ export function Garage({ car, nickname, onPlugged }: Props) {
           <span className="hint-chevron" aria-hidden>
             ▲
           </span>
-          <span className="label">DRAG THE CONNECTOR TO THE PORT</span>
+          <span className="label">
+            {holding ? 'DROP ON THE PORT' : 'HOLD THE PLUG · DRAG TO THE CAR'}
+          </span>
         </div>
       )}
 
-      {/* Reward terms stated before play — FR-BOOTH-7 / FR-BOOTH-8 */}
-      <p className="garage-terms">
+      <p className="garage-terms garage-chrome">
         Top 10 share 20% of any cash prize we win — nothing if we don't place. Full
         terms on the leaderboard. Multiple fingers are allowed.
       </p>

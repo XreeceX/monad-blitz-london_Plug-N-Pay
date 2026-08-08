@@ -14,7 +14,7 @@ const ROOM_TTL_MS = 2 * 60 * 60 * 1000 // 2h
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 
 /** @typedef {{ deviceId: string, nick: string, carId: string, carName: string, hue: number, joinedAt: number, lastSeen: number, bestScore: number }} Player */
-/** @typedef {{ id: string, hostToken: string, status: 'lobby'|'live'|'ended', createdAt: number, startedAt: number|null, players: Map<string, Player>, scores: Map<string, { nick: string, score: number, carName: string, at: number }>, totalWh: number, totalMon: number }} Room */
+/** @typedef {{ id: string, hostToken: string, status: 'lobby'|'live'|'ended'|'closed', createdAt: number, startedAt: number|null, players: Map<string, Player>, scores: Map<string, { nick: string, score: number, carName: string, at: number }>, totalWh: number, totalMon: number }} Room */
 /** @typedef {{ sessionId: string, deviceId: string, nick: string, carId: string, roomId: string|null, lastSeq: number, lastKW: number, totalWh: number, totalMon: number, priceMonPerKwh: number, v2gMonPerKwh: number, lastSeen: number, ended: boolean }} LiveSession */
 
 /** @type {Map<string, Room>} */
@@ -127,6 +127,9 @@ app.get('/api/room/:id', (req, res) => {
 app.post('/api/room/:id/join', (req, res) => {
   const room = rooms.get(String(req.params.id).toUpperCase())
   if (!room) return res.status(404).json({ error: 'room_not_found' })
+  if (room.status !== 'lobby') {
+    return res.status(403).json({ error: 'room_closed', status: room.status })
+  }
   const { deviceId, nickname, carId, carName, hue } = req.body ?? {}
   if (!deviceId || !nickname) return res.status(400).json({ error: 'bad_request' })
 
@@ -150,10 +153,22 @@ app.post('/api/room/:id/start', (req, res) => {
   if (!room) return res.status(404).json({ error: 'room_not_found' })
   const token = req.get('x-host-token')
   if (!token || token !== room.hostToken) return res.status(403).json({ error: 'forbidden' })
+  if (room.status === 'closed' || room.status === 'ended') {
+    return res.status(403).json({ error: 'room_closed', status: room.status })
+  }
   if (room.status === 'lobby') {
     room.status = 'live'
     room.startedAt = Date.now()
   }
+  res.json(publicRoom(room))
+})
+
+app.post('/api/room/:id/close', (req, res) => {
+  const room = rooms.get(String(req.params.id).toUpperCase())
+  if (!room) return res.status(404).json({ error: 'room_not_found' })
+  const token = req.get('x-host-token')
+  if (!token || token !== room.hostToken) return res.status(403).json({ error: 'forbidden' })
+  room.status = room.status === 'live' ? 'ended' : 'closed'
   res.json(publicRoom(room))
 })
 

@@ -11,9 +11,10 @@ interface Props {
   bestScore: number
   cachedTop: LeaderboardEntry[] | null
   onBack: () => void
+  onCloseGame: () => void
 }
 
-export function Leaderboard({ nickname, bestScore, cachedTop, onBack }: Props) {
+export function Leaderboard({ nickname, bestScore, cachedTop, onBack, onCloseGame }: Props) {
   const [entries, setEntries] = useState<LeaderboardEntry[] | null>(cachedTop)
   const [live, setLive] = useState(false)
 
@@ -86,9 +87,14 @@ export function Leaderboard({ nickname, bestScore, cachedTop, onBack }: Props) {
         </p>
       </div>
 
-      <button className="primary lb-back" onClick={onBack}>
-        BACK
-      </button>
+      <div className="lb-actions">
+        <button className="primary" onClick={onCloseGame}>
+          Close Game
+        </button>
+        <button className="lb-back" onClick={onBack}>
+          Back to results
+        </button>
+      </div>
     </div>
   )
 }

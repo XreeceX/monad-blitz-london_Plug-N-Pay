@@ -2,7 +2,7 @@
 
 const BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? '/api'
 
-export type RoomStatus = 'lobby' | 'live' | 'ended'
+export type RoomStatus = 'lobby' | 'live' | 'ended' | 'closed'
 
 export interface RoomPlayer {
   deviceId: string
@@ -61,6 +61,15 @@ export async function joinRoom(
 
 export async function startRoom(roomId: string, hostToken: string): Promise<RoomState | null> {
   return json<RoomState>(`/room/${encodeURIComponent(roomId)}/start`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-host-token': hostToken },
+    body: '{}',
+  })
+}
+
+/** Host locks the lobby — no further joins. Works before or after start. */
+export async function closeRoom(roomId: string, hostToken: string): Promise<RoomState | null> {
+  return json<RoomState>(`/room/${encodeURIComponent(roomId)}/close`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-host-token': hostToken },
     body: '{}',

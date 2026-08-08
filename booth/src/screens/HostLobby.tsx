@@ -3,7 +3,14 @@
 
 import { useEffect, useRef, useState } from 'react'
 import QRCode from 'qrcode'
-import { getRoom, isLoopbackUrl, joinUrl, startRoom, type RoomState } from '../net/room'
+import {
+  closeRoom,
+  getRoom,
+  isLoopbackUrl,
+  joinUrl,
+  startRoom,
+  type RoomState,
+} from '../net/room'
 
 interface Props {
   roomId: string
@@ -14,6 +21,7 @@ interface Props {
 export function HostLobby({ roomId, hostToken, onBack }: Props) {
   const [room, setRoom] = useState<RoomState | null>(null)
   const [starting, setStarting] = useState(false)
+  const [closing, setClosing] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [url, setUrl] = useState<string>('')
   const [loopback, setLoopback] = useState(false)
@@ -67,15 +75,25 @@ export function HostLobby({ roomId, hostToken, onBack }: Props) {
     setRoom(r)
   }
 
+  async function onCloseRoom() {
+    setClosing(true)
+    setErr(null)
+    await closeRoom(roomId, hostToken)
+    setClosing(false)
+    sessionStorage.removeItem(`pnp.host.${roomId}`)
+    onBack()
+  }
+
   const count = room?.count ?? 0
   const live = room?.status === 'live'
+  const locked = room?.status === 'closed' || room?.status === 'ended'
 
   return (
     <div className="screen host-lobby">
       <header className="host-head">
         <div>
           <p className="label">HOST · ONE ROUND</p>
-          <h1 className="host-title">PLUG-N-PAY</h1>
+          <h1 className="host-title">Plug-N-Pay</h1>
         </div>
         <div className="host-code-block">
           <span className="label">ROOM</span>
@@ -94,14 +112,14 @@ export function HostLobby({ roomId, hostToken, onBack }: Props) {
       <div className="host-body">
         <div className="host-qr-panel">
           <canvas ref={canvasRef} />
-          <p className="label">SCAN TO JOIN</p>
+          <p className="label">{live || locked ? 'ROOM LOCKED' : 'SCAN TO JOIN'}</p>
           <p className="num host-url">{url ? url.replace(/^https?:\/\//, '') : '…'}</p>
         </div>
 
         <aside className="host-side">
           <div className="host-stat">
             <span className="num host-stat-value">{count}</span>
-            <span className="label">PLAYERS WAITING</span>
+            <span className="label">{live ? 'PLAYERS IN ROUND' : 'PLAYERS WAITING'}</span>
           </div>
 
           <ol className="host-players">
@@ -124,7 +142,7 @@ export function HostLobby({ roomId, hostToken, onBack }: Props) {
           <div className="host-actions">
             {live ? (
               <>
-                <p className="live-note">ROUND LIVE — every phone is in the game</p>
+                <p className="live-note">ROUND LIVE — joins are locked</p>
                 <button
                   className="primary"
                   onClick={() => {
@@ -134,9 +152,11 @@ export function HostLobby({ roomId, hostToken, onBack }: Props) {
                     window.open(wall.toString(), '_blank')
                   }}
                 >
-                  OPEN STANDINGS WALL
+                  Open Standings Wall
                 </button>
               </>
+            ) : locked ? (
+              <p className="degraded-note">ROOM CLOSED — no further joins</p>
             ) : (
               <button
                 className="primary host-start"
@@ -144,17 +164,21 @@ export function HostLobby({ roomId, hostToken, onBack }: Props) {
                 disabled={starting || count === 0 || loopback}
               >
                 {loopback
-                  ? 'FIX URL FIRST'
+                  ? 'Fix URL first'
                   : starting
-                    ? 'STARTING…'
+                    ? 'Starting…'
                     : count === 0
-                      ? 'WAITING FOR PLAYERS'
-                      : `START ROUND · ${count}`}
+                      ? 'Waiting for players'
+                      : `Start Round · ${count}`}
               </button>
             )}
             {err && <p className="landing-error">{err}</p>}
-            <button className="host-back" onClick={onBack}>
-              CLOSE LOBBY
+            <button
+              className="host-back"
+              onClick={() => void onCloseRoom()}
+              disabled={closing}
+            >
+              {closing ? 'Closing…' : live ? 'End Round & Leave' : 'Close Room'}
             </button>
           </div>
         </aside>
