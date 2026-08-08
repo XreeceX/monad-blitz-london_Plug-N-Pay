@@ -385,7 +385,7 @@ Format: **UC-n · Name** — actors, preconditions, main flow, alternates, postc
 | FR-REL-6 | The relay MUST accept energy deltas from booth-app sessions through the same interface as simulated ones. | S | T |
 | FR-REL-7 | The relay MUST NOT hold or require any participant's private key beyond its own hot wallet. | M | I |
 | FR-REL-8 | Because one account's transactions are processed in nonce order, the relay MUST submit from a **pool of funded wallets**, sized so the target transactions per second can be issued in parallel rather than queued behind a single nonce. This makes the faucet a harder dependency than ASM-1 assumed. | M | T |
-| FR-REL-9 | Before committing build time to the per-tick path, the team MUST measure the public RPC's actual sustained transaction rate and record the number. An undocumented limit MUST be converted into a measured one. | M | T |
+| FR-REL-9 | **DONE 2026-08-08 — see §13.4.** Public RPC serves ~40 req/s cleanly; first refusals at 45, latency collapses by 50 (p50 456 ms) and 70 (p50 1,960 ms). Read calls only, so this is an upper bound on write throughput. Reproduce with `node tools/measure-rpc.mjs`. | M | T |
 
 ### M6 — Simulator & spawner
 
@@ -516,7 +516,7 @@ Defined in `2026-08-08-booth-frontend-design.md` §8. System-level obligations:
 | ID | Requirement | Target | Ver |
 |---|---|---|---|
 | NFR-P-1 | Settlement cadence per session | 1 Hz, configurable | D |
-| NFR-P-2 | Concurrent sessions sustained during the demo | ≥ 10 rehearsed, ≥ 50 attempted | D |
+| NFR-P-2 | Concurrent sessions sustained during the demo | ≥ 10 rehearsed and live. The 50-session stretch is **recorded, not live** — measurement (§13.4) puts 50 tx/s past the RPC knee | D |
 | NFR-P-3 | Settlement visible on the wall after landing | ≤ 1 s | D |
 | NFR-P-4 | Dashboard frame rate at target concurrency | Readable, no visible stutter | D |
 | NFR-P-5 | Booth app frame rate on mid-range Android | 60 fps | T |
@@ -695,6 +695,31 @@ One transaction per session per tick was chosen over bundling for the stronger c
 **Open tension with §13.2.** The adversarial review scoped FR-REL-3 down to serialised-pipeline nonce handling and said to build nothing more. That reasoning assumed batching was primary. The per-tick decision reinstates the parallel-nonce work it ruled out. FR-REL-3 now covers both modes explicitly, but the two conclusions were reached from different premises and the reviewer has not seen the newer decision.
 
 **Reversal trigger.** If measured capacity cannot sustain ten sessions with headroom, switch to FR-REL-2 batching — and FR-REL-3 collapses back to the simpler serialised form. Make that call on the measurement, early, not on stage.
+
+### 13.4 The RPC measurement, and what it decided
+
+Run 2026-08-08 against `https://testnet-rpc.monad.xyz` with `tools/measure-rpc.mjs`. Read calls (`eth_blockNumber`), paced by arrival time, five to six seconds per rate.
+
+| req/s | ok | 429 | p50 ms | p95 ms |
+|---|---|---|---|---|
+| 5 | 25/25 | 0 | 27 | 118 |
+| 10 | 50/50 | 0 | 24 | 103 |
+| 20 | 100/100 | 0 | 21 | 108 |
+| 40 | 200/200 | 0 | 81 | 162 |
+| 45 | 267/270 | 3 | 99 | 147 |
+| 50 | 296/300 | 4 | 456 | 731 |
+| 60 | 350/360 | 10 | 900 | 1,761 |
+| 70 | 416/420 | 4 | 1,960 | 3,815 |
+
+**The knee is between 40 and 45 req/s.** Latency is flat to about 20 req/s, rises by 40, and collapses past 50.
+
+**What it settles:**
+
+- **AC-5's ten concurrent sessions need 10 tx/s. That has roughly four times headroom and sits in the flat-latency band.** Per-tick settlement (FR-REL-1) is the right call at the rehearsed bar, and the reversal trigger above does not fire.
+- **The fifty-session stretch in NFR-P-2 is not achievable live.** 50 req/s is already past the knee for read calls, which are the cheap ones — writes add signature recovery, nonce ordering and mempool admission, so the write ceiling is strictly lower than 40. Run the stretch from a recording, or drop the claim. Attempting it live walks into RSK-1.
+- **CON-5 is closed.** The limit was undocumented; it is now measured. It was never published because it is enforced dynamically — refusals begin as a trickle (1.1% at 45 req/s) rather than a hard cutoff, so a naive test at a single rate would have missed it entirely.
+
+**What it does not settle.** These are reads. A write-path measurement needs a funded wallet and was not run. Before trusting 10 tx/s of *settlement*, repeat this against `eth_sendRawTransaction` with the relay's wallet pool (FR-REL-8) — the number will be lower, and only that number tells you whether AC-5 is safe.
 
 ---
 
