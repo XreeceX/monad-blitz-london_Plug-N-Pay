@@ -1,37 +1,13 @@
 // The public leaderboard screen — booth spec §3.8, FR-BOOTH-10/11/12.
 // Same room-scoped /api/leaderboard as player phones, so ranks stay consistent.
-// Top 3 celebrate; top 10 highlighted. No prize/reward copy.
+// Top 3 celebrate; top 10 highlighted. No join QR — lobby is locked once live.
 
 import { useEffect, useRef, useState } from 'react'
-import QRCode from 'qrcode'
 import { getLeaderboard, getWall, type LeaderboardEntry, type WallData } from '../net/relay'
 import { fmtWh } from '../components/Counter'
 
 const SEAL_KEY = 'pnp.wall.sealed'
 const MEDAL = ['🥇', '🥈', '🥉'] as const
-
-const JOIN_URL =
-  (import.meta.env.VITE_PUBLIC_URL as string | undefined) ??
-  `${window.location.origin}${window.location.pathname}`
-
-function JoinQr() {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  useEffect(() => {
-    if (!canvasRef.current) return
-    void QRCode.toCanvas(canvasRef.current, JOIN_URL, {
-      width: 232,
-      margin: 2,
-      color: { dark: '#000000', light: '#FFFFFF' },
-    })
-  }, [])
-  return (
-    <div className="wall-qr">
-      <canvas ref={canvasRef} />
-      <span className="label">SCAN TO PLAY</span>
-      <span className="num wall-qr-url">{JOIN_URL.replace(/^https?:\/\//, '')}</span>
-    </div>
-  )
-}
 
 function wallRowClass(r: LeaderboardEntry) {
   const bits = ['wall-row', 'wall-top10']
@@ -143,7 +119,7 @@ export function Wall() {
         </div>
       )}
 
-      <div className="wall-body">
+      <div className="wall-body wall-body-no-qr">
         <ol className="wall-list">
           {entries.length === 0 && (
             <li className="wall-row wall-empty">
@@ -163,7 +139,6 @@ export function Wall() {
         </ol>
 
         <aside className="wall-side">
-          <JoinQr />
           <div className="wall-stat">
             <span className="num wall-stat-value">{wall?.count ?? 0}</span>
             <span className="label">CARS LIVE NOW</span>

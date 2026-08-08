@@ -941,6 +941,10 @@
   min-height: 0;
 }
 
+.wall-body-no-qr {
+  grid-template-columns: 1fr minmax(200px, 260px);
+}
+
 .wall-champ {
   display: flex;
   align-items: center;
