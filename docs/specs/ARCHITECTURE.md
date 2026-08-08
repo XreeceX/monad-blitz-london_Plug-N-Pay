@@ -1539,23 +1539,58 @@ T-2h, **do not fall back to one wallet — fall back to fewer sessions.** One wa
 per-tick are incompatible; ASM-1 says so directly ("Falling back to a single relay wallet
 means falling back to batching... the two are the same decision", `REQUIREMENTS.md:149`).
 
-### ADR-3 · `eth_sendRawTransactionSync` for every settlement
+### ADR-3 · Async on the rail, sync on the bridge — **REVERSED 2026-08-08**
 
-**Decision.** Every settlement uses the sync method with an explicit `timeout_ms`. No
-separate receipt poll exists anywhere in the codebase.
+**Decision.** Transport is chosen per *call site*, not globally:
 
-**Why.** It halves-to-quarters the RPC cost per tick (§11 C11): 10 req/s instead of
-20–40 at the 10 tx/s budget. It is the difference between 4× headroom and sitting on the
-measured knee.
+| Path | Method | Why |
+|---|---|---|
+| **Rail, per-tick `settle()` (M5)** | **async `eth_sendRawTransaction` + retry** | A sync send blocks until inclusion, which **serialises exactly the thing the rail needs concurrent** |
+| **Closing `settleRoomAggregate` (ADR-9)** | **sync `eth_sendRawTransactionSync`** | One call, once, at the moment the presenter needs a hash on screen *inside a sentence*. One round trip instead of submit-then-poll |
 
-**Cost.** A hard dependency on a Monad-specific RPC extension. The relay's submission
-path blocks per wallet for the full inclusion time, which is what sets the 600 ms
-occupancy in §5.2 and therefore the pool size.
+**The method is VERIFIED to exist** on `https://testnet-rpc.monad.xyz` — no longer an
+assumption. Probed with a **negative control**, which is what makes the result
+trustworthy:
 
-**Reversal trigger.** If W0 finds the method unavailable or unreliable on
-`https://testnet-rpc.monad.xyz`, fall back to `eth_sendRawTransaction` plus a receipt
-poll **and halve the settlement rate to 5 tx/s in the same change.** The rate cut is not
-optional — the fallback costs 2–4× the RPC per tick.
+```
+eth_blockNumber             → result present           control: a method that EXISTS
+eth_thisMethodDoesNotExist  → -32601 Method not found   control: a method that DOESN'T
+eth_sendRawTransactionSync  → code 5 "The transaction is not ready to be processed"
+eth_sendRawTransaction      → -32603 Transaction decoding error
+```
+
+A **domain error rather than −32601** is something only an implemented method returns.
+And it takes a *different* error path from the async variant on the same garbage payload,
+so it is a **distinct implementation, not an alias**.
+
+**Why the original decision was backwards.** ADR-3 first put sync on the per-tick path to
+save an RPC call, when the RPC budget was believed to be the binding constraint. Two
+things killed that reasoning:
+
+1. **The budget constraint evaporated** — both ceilings retracted (§16.10). Saving a call
+   per tick buys nothing against no observed limit.
+2. **Blocking is the real cost, and it lands on the wrong path.** A sync send holds the
+   submitting wallet until inclusion. On a path that wants ten concurrent settlements per
+   second, that is a self-inflicted serialisation.
+
+**This is §16.8's error seen from the other side, and the connection is worth keeping.**
+My 600 ms occupancy model was **correct for a sync send** — sync really does hold a wallet
+for the full inclusion time. The mistake was treating that as a property of *the rail*
+rather than of *the method ADR-3 had chosen for it*. The occupancy model was not wrong
+about physics; **it was measuring the cost of ADR-3's own mistake.** Choosing async
+removes the serialisation the model described, which is why §16.8's re-derivation and this
+reversal are one correction wearing two hats.
+
+**Cost.** Async settle needs retry and a receipt path. **Retry is already the primary
+mitigation** from the retraction (§16.10) — transient timeouts appear at every load — so
+this costs nothing new. The one-call-per-tick budget claim that used to live here has been
+removed entirely: it argued for a constraint that no longer exists.
+
+**Reversal trigger.** Put sync back on the rail only if async submission is shown to lose
+transactions in a way retry cannot recover — and check the **shape** first (§16.10),
+because a flat single-digit timeout rate is a reason to retry, not to change transport.
+For the bridge, keeping the async fallback costs nothing: it is one call, so
+submit-then-poll is an acceptable degradation if sync misbehaves on the day.
 
 ### ADR-4 · Signature verification off-chain, in the relay
 
@@ -1929,6 +1964,22 @@ single-digit failure count at one rate was treated as the onset of throttling wi
 checking whether it *rose* with load. It did not. Both runs also used the shared public
 key `0x…0001`, whose nonce moved **20 → 89 between runs** — strangers were actively
 transacting from it, and contention was never ruled out.
+
+> **Measure the shape, not the point.**
+>
+> The lesson is not "measure more" — more runs at the same rate would have produced the
+> same wrong answer with tighter error bars. **The tell was already inside the data.**
+> Sixty clean while forty failed is non-monotonic, and non-monotonicity is checkable in
+> the same run that produces the number, at zero extra cost. Nobody asked *"does this rise
+> with load?"* — and that single question is the whole difference between a capacity limit
+> and a noise floor.
+>
+> The read table had the same signature and it was quoted, by me, in this document: 10
+> refusals at 60 req/s, then **4 at 70**. A ceiling does not get better as you push harder.
+>
+> **Applies to every measurement this project makes.** A number at one operating point is
+> a data point; a monotonic trend across several is a limit. Only the second is quotable
+> on stage.
 
 ### The corrected numbers
 
