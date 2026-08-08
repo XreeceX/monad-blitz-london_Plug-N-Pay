@@ -1,0 +1,27 @@
+{
+  "name": "plug-n-pay",
+  "version": "1.0.0",
+  "description": "Per-second EV charging settlement on Monad",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/XreeceX/monad-blitz-london_Plug-N-Pay.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/XreeceX/monad-blitz-london_Plug-N-Pay/issues"
+  },
+  "homepage": "https://github.com/XreeceX/monad-blitz-london_Plug-N-Pay#readme",
+  "dependencies": {
+    "viem": "^2.55.11"
+  }
+}

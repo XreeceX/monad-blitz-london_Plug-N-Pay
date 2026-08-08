@@ -8,3 +8,5 @@
 agent/
 .cursor/skills/
 **/.DS_Store
+
+node_modules/
