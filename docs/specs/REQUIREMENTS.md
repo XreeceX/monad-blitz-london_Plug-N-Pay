@@ -424,13 +424,13 @@ Priority split (corrected — see traceability note below): FR-BOOTH-1/2/4 are *
 |---|---|---|---|
 | FR-BOOTH-1 | A participant MUST reach a playable state from QR scan with no install, no login, and no wallet. | S | D |
 | FR-BOOTH-2 | The app MUST NOT block on the network at any point, and MUST NOT display a network error to a participant. | S | D |
-| FR-BOOTH-3 | The app MUST report tap events to the **game server (M10)**, not to the settlement relay. **Superseded 2026-08-08 by §16: the booth app makes no chain calls at all.** | M | T |
+| FR-BOOTH-3 | The app MUST report tap events to the **game server (M10)**. Amended 2026-08-08 by §16 — the original required reporting energy deltas through the M5 relay interface, which the booth no longer touches. | M | T |
 | FR-BOOTH-4 | The app MUST remain fully playable with the relay unreachable. | S | D |
 | FR-BOOTH-5 | The app MUST NOT collect credentials, private keys, or payment details. | M | I |
 | FR-BOOTH-6 | Any participant reward MUST be decided by skill, never by a randomly assigned attribute. | M | I |
 | FR-BOOTH-7 | Reward terms MUST be stated in the app before a participant plays. | M | I |
 | FR-BOOTH-8 | The app MUST NOT solicit votes or ask a participant to influence the judging in any way. It MUST state the reward's dependency on the team placing, as fact, because FR-BOOTH-7 requires complete terms and a hidden condition is worse than a disclosed one. Amended 2026-08-08 when the conditional reward was chosen — see §13.1. | M | I |
-| FR-BOOTH-9 | On load, the app MUST generate an ephemeral session key client-side and silently register it (UC-11) before the first energy delta is reported — a participant MUST NOT be asked to hold or manage a key. This resolves the gap where FR-MET-3 requires every reading to be signed but FR-BOOTH-5 forbids collecting keys from the participant. | S | D |
+| FR-BOOTH-9 | ~~Ephemeral client-side session key.~~ **Withdrawn 2026-08-08.** It existed to reconcile FR-MET-3 (every reading signed) with FR-BOOTH-5 (collect no keys). §16 dissolved the conflict instead: a client that signs nothing and submits nothing needs no key, and FR-SPLIT-1 forbids the app holding key material at all. Keeping it would have had the frontend generate and register a key with no consumer. | — | — |
 | FR-BOOTH-10 | A public leaderboard screen MUST show live standings at the booth, legible across a busy room, updating at least every 5 s. | S | D |
 | FR-BOOTH-11 | The public screen MUST seal 10 s before the contest closes, showing an unambiguous sealed state rather than merely freezing, so a stale screen cannot be mistaken for a live one. | S | D |
 | FR-BOOTH-12 | Final standings MUST be reviewed before publication and revealed after the event, not at the venue. | M | I |
@@ -553,7 +553,7 @@ Defined in `2026-08-08-booth-frontend-design.md` §8. System-level obligations:
 | ID | Requirement | Ver |
 |---|---|---|
 | NFR-U-1 | The wall is readable from ten metres by someone who has not seen it before. | D |
-| NFR-U-2 | A viewer can tell charge from discharge without reading text. | D |
+| NFR-U-2 | A viewer ten metres away can tell charge from discharge without reading text. On the wall this is carried by **direction of travel and fill state**, not by a second hue — see §17. | D |
 | NFR-U-3 | The booth app is playable one-handed, in portrait, on a scratched screen in a bright room. | D |
 | NFR-U-4 | The booth app respects `prefers-reduced-motion`. | I |
 
@@ -677,7 +677,7 @@ Two further items originate in this document:
 | Gap | Resolution | Where it lives |
 |---|---|---|
 | Signature verification location undefined; on-chain-per-tick is infeasible at target concurrency | Named as a trust boundary: relay (M5) verifies off-chain, contract trusts the relay's attestation | ASM-6, FR-SET-2, IF-1, NFR-M-4 |
-| Booth app has no key but FR-MET-3 requires every reading signed | Ephemeral client-side key, silently registered on load | FR-BOOTH-9 |
+| Booth app has no key but FR-MET-3 requires every reading signed | ~~Ephemeral client-side key~~ — resolved differently by §16: the booth signs nothing, so the conflict no longer exists. FR-BOOTH-9 withdrawn | FR-BOOTH-9 |
 | FR-BOOTH-1/2/4/5/6/7/8 all marked M despite M8 being built last with "absence costs nothing" | Split: playability requirements (1/2/4) downgraded to S; standing constraints (5/6/7/8) stay M as conditional ("if it ships, these are non-negotiable") | M8 table |
 | FR-DASH-8/IF-6 banned long-lived connections, which forces high-frequency polling that would overload the relay | Reworded to require a reconnect-safe streaming transport (SSE/WS with auto-reconnect), not a ban on streaming itself | FR-DASH-8, IF-6 |
 | NFR-P-2 (50 simulated) and IF-10 (60-phone surge) were never reconciled — additive reading implies a ~110 peak, past RSK-1's named worst failure mode | Surge substitutes for simulated load rather than adding to it; excess is capped and labelled, not silently allowed through | UC-10, FR-OPS-2 |
@@ -842,3 +842,24 @@ A peer vote punishes perceived overclaiming far harder than it punishes modest s
 ### 16.6 Residual risk
 
 The risk has moved, not vanished. It is now **venue wifi**. Host the game server in the cloud so phones can fall back to cellular; run the dashboard locally with a hotspot.
+
+
+---
+
+## 17. Wall palette: one accent, direction carried by form
+
+The booth palette is cyan on near-black with a single accent, and the Flip inverts the whole screen (booth spec §10). **That inversion is only available to the phone**, which shows one session at a time. The wall shows many concurrent sessions and cannot invert per node, so the question is whether it needs a second hue to satisfy NFR-U-2.
+
+**Decision: it does not. The wall stays single-accent, and direction is carried by form.**
+
+| | Charging | Selling to grid |
+|---|---|---|
+| Node | Solid fill | Hollow ring |
+| Pulse | Travels **inward**, toward the node | Travels **outward**, away from it |
+| Luminance | Cyan at power-proportional brightness | Same, plus a brighter rim |
+
+NFR-U-2 asks that a viewer tell the two apart *without reading text*, not specifically by colour. Direction of travel is more legible across a room than hue is, and it is truthful rather than decorative: the pulse moves the way the energy moves. A projector also distorts colour unpredictably while it never distorts motion.
+
+**This is a reversible call with a test.** At rehearsal, stand ten metres from the projector with both directions running and see whether the difference reads in under two seconds. If it does not, the documented fallback is to give V2G nodes a **white-hot rim** rather than introducing a third colour, keeping the cyan-and-black identity intact.
+
+**Why not simply add a second hue.** The booth spec's §10 argument holds here too: cyan on black is one screenshot away from every generated dark dashboard, and single-accent restraint is most of what separates them. A second hue added for legibility would be defensible; a second hue added by default would not, and the test decides which this is.
