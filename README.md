@@ -24,6 +24,7 @@ Install source: https://skills.devnads.com/install.md
 
 | Path | What |
 |---|---|
+| [`CLAUDE.md`](CLAUDE.md) | Project rules for agents — MONSKILLS routing, hard rules, doc hierarchy |
 | [`docs/MONSKILLS.md`](docs/MONSKILLS.md) | MONSKILLS install + agent routing |
 | [`docs/monad_dev_resources.md`](docs/monad_dev_resources.md) | Testnet RPC, faucet, Foundry, event cheat sheet |
 | [`docs/specs/`](docs/specs/) | Requirements + booth frontend design |

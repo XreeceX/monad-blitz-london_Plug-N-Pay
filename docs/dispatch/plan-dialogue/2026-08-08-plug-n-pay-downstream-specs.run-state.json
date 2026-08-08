@@ -1,0 +1,78 @@
+{
+  "run": "2026-08-08-plug-n-pay-downstream-specs",
+  "task_class": "production-build",
+  "dispatcher": "Opus 5, max effort",
+  "goal": "From docs/specs/REQUIREMENTS.md + docs/idea/*, produce build-ready DESIGN.md, ARCHITECTURE.md, API.md and TEST-PLAN.md covering every requirement ID, resolved against adversarial Fable-5 review over up to 3 rounds; wire MONSKILLS into a project CLAUDE.md.",
+  "approved_at_gate": "2026-08-08T13:05+01:00",
+  "shared_dir": "docs/dispatch/2026-08-08-plug-n-pay-downstream-specs/",
+  "preflight": "N/A - deliverables are four specification documents, no code written or changed. Forced-decision half executed inline at the gate (FD-1..FD-5).",
+  "forced_decisions": {
+    "FD-1": "OD-1 booth sessions: WALL-ONLY today, MON labelled simulated (booth spec section 9, level L1). On-chain via the same relay interface is documented as the stretch. APPROVED.",
+    "FD-2": "Adopt the documented 50 rps as the design budget AND keep FR-REL-9 measurement as the first build task. The limit is per-IP behind venue NAT so the real figure will be lower. APPROVED.",
+    "FD-3": "Split transport by hop: SSE from the self-hosted relay to the wall (no Vercel 300s cap in that path); polling only where a Vercel function is in the path. Dissolves C6. APPROVED.",
+    "FD-4": "Docs cover the full development cycle, with today's 18:00 freeze slice marked inline. APPROVED.",
+    "FD-5": "Annotate stale booth-spec items (section 8 single hot wallet, section 15.2 reward) as superseded; do not rewrite that doc. APPROVED."
+  },
+  "budget": {
+    "ceiling_tokens": 650000,
+    "descope_checkpoint_tokens": 520000,
+    "enforcement": "policy, not mechanical",
+    "spawn_cap": 10,
+    "spawns_used": 2,
+    "max_concurrent": 3,
+    "max_redteam_rounds": 3,
+    "spent_reported": 0
+  },
+  "acceptance_criteria": {
+    "AC-D1": "Four files exist: docs/specs/{DESIGN,ARCHITECTURE,API,TEST-PLAN}.md",
+    "AC-D2": "100% of requirement IDs appear in at least one downstream doc; every M-priority FR has a named design element AND a named test case, checked against the coverage ledger",
+    "AC-D3": "All 12 inherited contradictions (C1..C12) resolved in writing with the chosen answer and its consequence, or explicitly escalated",
+    "AC-D4": "Every Monad number carries a file:line or URL citation; no recalled figures",
+    "AC-D5": "TEST-PLAN gives a runnable command or an explicit operator script per AC-1..AC-11 and per M-priority FR, with pass/fail thresholds",
+    "AC-D6": "API.md covers contract functions, events, custom errors and measured gas limits; meter payload and signature scheme; relay HTTP and stream; booth endpoints; dashboard stream - each with examples and error codes",
+    "AC-D7": "3 adversarial rounds run (fewer only if a round adds no new material objection), with an objection log tagging ACCEPTED / REJECTED / UNRESOLVED",
+    "AC-D8": "Project CLAUDE.md exists, names the MONSKILLS routing rule, install verified present",
+    "AC-D9": "Unknowns Ledger empty at close, or DONE_WITH_CONCERNS naming every open item"
+  },
+  "contradictions_to_resolve": {
+    "C1": "RPC limit called undocumented in REQUIREMENTS (CON-5 line 141, ASM-4 line 152, FR-REL-9 line 388) but documented in docs/monad_dev_resources.md:141 as 50 rps, 25 rps for eth_call, batch 100",
+    "C2": "50-session stretch (NFR-P-2 line 519) at 1 Hz = 50 tx/s = 100 percent of the documented rps budget under per-tick (FR-REL-1 line 380). No headroom for receipts or reads",
+    "C3": "The 50 rps is per-IP; venue wifi likely NATs the whole room behind one IP (REQUIREMENTS line 132)",
+    "C4": "Reserve balance: 10 MON floor per EOA, below it throttled to about 1 tx per 1.2s (concepts/SKILL.md:25). Threatens the FR-REL-8 wallet pool (line 387). Absent from requirements",
+    "C5": "Newly funded accounts need about 1.2s before transacting (concepts/SKILL.md:23). Affects pool bring-up and booth live registration",
+    "C6": "Booth spec lines 45 and 381 say the Vercel 300s cap killed SSE and the wall polls. REQUIREMENTS FR-DASH-8 line 412 and IF-6 line 494 mandate a reconnect-safe stream, SSE recommended",
+    "C7": "Booth spec line 438 specifies a single funded hot wallet; FR-REL-8 line 387 mandates a pool",
+    "C8": "Booth spec line 608 lists the reward as unresolved and recommends unconditional; booth line 341 and REQUIREMENTS line 659 both record it decided as conditional 20 percent, table A",
+    "C9": "Gas is charged on gas_limit, not gas used (gas/SKILL.md:14). About 9000 transactions in a 3-minute demo at 50 sessions. No requirement computes the MON burn or sizes the funding",
+    "C10": "Performance figures conflict: monskill/SKILL.md:30 says 400ms block and 800ms finality; docs/monad_dev_resources.md:96 says 300ms and 600ms",
+    "C11": "eth_sendRawTransactionSync exists (monskill/SKILL.md:31) and would remove a receipt round-trip per tick. Unused in every spec",
+    "C12": "OD-1 and OD-2 are open (REQUIREMENTS lines 668-669) but FR-SIM-6 line 399 and FR-BOOTH-9 line 432 have effectively answered OD-2"
+  },
+  "dag": [
+    {"id": 1, "subject": "Monad platform ground-truth sheet", "executor": "researcher agent monad-facts", "model": "sonnet/high", "depends": [], "wave": "W1", "status": "in_progress", "deliverable": "docs/dispatch/2026-08-08-plug-n-pay-downstream-specs/monad-facts.md", "est_tokens": 35000, "result_line": null},
+    {"id": 2, "subject": "Requirement coverage ledger", "executor": "general-purpose agent req-ledger", "model": "sonnet/medium", "depends": [], "wave": "W1", "status": "in_progress", "deliverable": "docs/dispatch/2026-08-08-plug-n-pay-downstream-specs/coverage-ledger.md", "est_tokens": 30000, "result_line": null},
+    {"id": 3, "subject": "Write ARCHITECTURE.md and DESIGN.md", "executor": "engineer agent architect", "model": "opus/max", "depends": [1, 2], "wave": "W2", "status": "pending", "deliverable": "docs/specs/ARCHITECTURE.md, docs/specs/DESIGN.md", "est_tokens": 140000, "result_line": null},
+    {"id": 4, "subject": "Write API.md", "executor": "engineer agent api-author", "model": "sonnet/high", "depends": [3], "wave": "W2", "status": "pending", "deliverable": "docs/specs/API.md", "est_tokens": 55000, "result_line": null},
+    {"id": 5, "subject": "Write TEST-PLAN.md", "executor": "engineer agent test-author", "model": "sonnet/high", "depends": [2, 3], "wave": "W2", "status": "pending", "deliverable": "docs/specs/TEST-PLAN.md", "est_tokens": 65000, "result_line": null},
+    {"id": 6, "subject": "Red team A: coverage, internal contradiction, attack the plan itself", "executor": "Fable 5 fable-coverage", "model": "fable/high", "depends": [3, 4, 5], "wave": "W3", "status": "pending", "deliverable": "findings-A.md", "est_tokens": 40000, "result_line": null},
+    {"id": 7, "subject": "Red team B: Monad and chain feasibility, RPC and gas arithmetic, load failure modes", "executor": "Fable 5 fable-chain", "model": "fable/high", "depends": [3, 4, 5], "wave": "W3", "status": "pending", "deliverable": "findings-B.md", "est_tokens": 40000, "result_line": null},
+    {"id": 8, "subject": "Red team C: buildability in the hours left, test executability, demo beat survival", "executor": "Fable 5 fable-build", "model": "fable/high", "depends": [3, 4, 5], "wave": "W3", "status": "pending", "deliverable": "findings-C.md", "est_tokens": 40000, "result_line": null},
+    {"id": 9, "subject": "Rounds 2-3: apply fixes, re-attack via SendMessage to rows 3-8, no respawn", "executor": "rows 3-8 reused", "model": "mixed/high", "depends": [6, 7, 8], "wave": "W3", "status": "pending", "deliverable": "revised docs plus objection log", "est_tokens": 80000, "result_line": null},
+    {"id": 10, "subject": "Project CLAUDE.md and MONSKILLS wiring", "executor": "inline (lead)", "model": "opus", "depends": [], "wave": "W4", "status": "completed", "deliverable": "CLAUDE.md", "est_tokens": 8000, "result_line": "CLAUDE.md written. MONSKILLS install verified at .agents/skills/ - 9 skills, skills-lock.json matches. README project-docs row still to add."},
+    {"id": 11, "subject": "Independent completeness verifier, fresh context, SUPPORTED/UNSUPPORTED/FALSE per material claim", "executor": "general-purpose verifier", "model": "opus/max", "depends": [9, 10], "wave": "W5", "status": "pending", "deliverable": "verdict plus evidence", "est_tokens": 45000, "result_line": null}
+  ],
+  "red_team_placement": "rows 6, 7, 8 concurrent the moment the W2 candidates exist; rounds 2-3 at row 9. Not deferred to the end.",
+  "panel_points": "Final pre-DONE verdict (row 11). Deviation stated at the gate: external seats (sol via Codex, cursor-grok-4.5-high) not used - no egress needed, Codex CLI unverified this session, and the user named Fable 5 as the adversary. The Fable-5 trio is the standing adversary; row 11 is the outside completeness seat.",
+  "model_note": "Opus 4.8 is not selectable from this harness - only opus, sonnet, haiku, fable. Row 11 runs Opus 5 in a fresh context. Stated rather than implying 4.8 ran.",
+  "unknowns_ledger": [
+    {"id": "U1", "item": "Whether the 50 rps QuickNode limit is per-IP, per-key or global", "status": "routed", "to": "row 1 Q2"},
+    {"id": "U2", "item": "Whether a relay wallet below the 10 MON reserve floor can issue more than 1 tx per 1.2s", "status": "routed", "to": "row 1 Q3"},
+    {"id": "U3", "item": "Whether eth_sendRawTransactionSync removes the per-tick receipt poll", "status": "routed", "to": "row 1 Q7"},
+    {"id": "U4", "item": "Authoritative Monad block time and finality, 300/600 versus 400/800", "status": "routed", "to": "row 1 Q10"},
+    {"id": "U5", "item": "Monad brand purple published value, 6E54FF versus 836EF9", "status": "routed", "to": "row 1 Q11"},
+    {"id": "U6", "item": "Real MON burn for the demo at 10 and 50 sessions under gas-on-limit", "status": "routed", "to": "row 1 Q6"},
+    {"id": "U7", "item": "Whether the REQUIREMENTS section 9 traceability table misses more requirements than the two it admits", "status": "routed", "to": "row 2 traceability holes"}
+  ],
+  "gateguard_note": "This repo runs a GateGuard hook that blocks the first Write of any new file until facts are presented (who reads it, no duplicate exists, data structure, verbatim user instruction). Worker spawn prompts must warn about this or workers will stall on their first file creation.",
+  "resume_instructions": "Read this file first. Check shared_dir for completed deliverables before relaunching anything - 'claimed done' and 'on disk' are different. Relaunch only rows whose status is not completed. Row 3's spawn prompt must carry the FD-1..FD-5 answers, the C1..C12 contradiction list, both W1 deliverable paths, and the acceptance criteria."
+}
