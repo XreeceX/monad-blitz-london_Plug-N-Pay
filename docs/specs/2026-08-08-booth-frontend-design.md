@@ -245,8 +245,8 @@ TAPER_START_SOC    = 0.80
 TAPER_FLOOR        = 0.25     // multiplier at 100% SoC
 SURGE_WINDOWS_MS   = [[10000, 13000], [24000, 27000], [36000, 39000]]
 SURGE_MULTIPLIER   = 2.0
-SETTLE_INTERVAL_MS = 8_000    // per player; phase-staggered. 7.5 tx/s at 60
-                              // players vs a measured ceiling of 10. See §8
+TICK_REPORT_MS     = 1_000    // tap events → game server. NOT a chain call.
+                              // The booth app settles nothing. See REQUIREMENTS §16
 PRICE_MON_PER_KWH  = 0.12     // charging, player pays
 V2G_MON_PER_KWH    = 0.30     // sell-back premium, player earns
 ```
@@ -384,9 +384,13 @@ Because the payout depends on placing, **the condition must be stated up front**
 
 The section the backend developer implements against. It is deliberately dull.
 
-**Principle: the phone is authoritative for its own gameplay and never blocks on the network.** Every request is fire-and-forget. Every failure is silent. There is no spinner, no retry dialog, no error toast anywhere in this app.
+> **SUPERSEDED 2026-08-08 — read `REQUIREMENTS.md` §16 first.** This section described the booth app reporting energy deltas to the settlement relay, which submitted them on-chain. **The booth app no longer touches the chain at all.** It talks to a game server that runs the settlement engine in memory. The endpoint shapes below are still broadly the right shape for that server, but every reference to settlement, wallets, batching or the chain is void, and `POST /api/surge`'s server-clock scheduling is the one piece worth keeping verbatim.
+>
+> What replaced it, in one line: taps go to the game server, the game server scores them (FR-SPLIT-3) and holds the leaderboard, and the only chain interaction in the entire crowd path is a single aggregate transaction at the close of the pitch (§16.4).
 
-**Transport: polling, not SSE or WebSockets.** Constraint #1 means a long-lived stream dies at five minutes on Hobby. The wall polls once per second. At sixty players this is trivial load and it cannot time out.
+**Principle: the phone is authoritative for its own gameplay and never blocks on the network.** Every request is fire-and-forget. Every failure is silent. There is no spinner, no retry dialog, no error toast anywhere in this app. That principle survives the pivot unchanged and is the reason the app still works if the venue wifi dies mid-round.
+
+**Transport: polling or a websocket to the game server.** The Vercel streaming cap (constraint #1) applied to a serverless dashboard reading chain events; a cloud-hosted game server has no such limit. Sixty websockets is trivial.
 
 ### Endpoints
 
@@ -442,6 +446,8 @@ POST /api/surge                         # presenter only, shared secret header
 In-memory queue, cap 50 ticks. On failure, retry with backoff (250ms, 1s, 4s), then drop the oldest. The queue never blocks the render loop and never surfaces to the player.
 
 ### Chain writes
+
+**Void — see REQUIREMENTS §16.** Retained only because the reasoning below is what led to the split.
 
 **The phone never touches the chain.** If the team wants audience sessions settling on Monad, the relay owns it: aggregate every active session's watt-hour delta into one batched transaction per second from a single funded hot wallet. That is the multicall design already under discussion in `docs/idea/open_questions.md` Q2, and it means one wallet to fund and one place to manage nonces. With the public RPC's limits undocumented (constraint #8), assume it will not hold and let the wall's MON figure degrade to `simulated` without ceremony.
 
