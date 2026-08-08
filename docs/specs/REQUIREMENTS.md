@@ -128,6 +128,7 @@ The system's primary actors are machines. This is a defining property, not an ac
 | Agents / relay | Node.js, off-chain processes |
 | Dashboard | Browser on a projector, 1920×1080 assumed, viewed from up to 10 metres |
 | Booth app | Mobile browsers, portrait, iOS Safari and Android Chrome |
+| Game server (M10) | **Render**, cloud-hosted, so phones can fall back to cellular when venue wifi degrades |
 | Network | Venue wifi, congested, shared with every other team |
 
 ### 2.5 Design and implementation constraints

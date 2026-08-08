@@ -470,24 +470,41 @@ L3 is the one that cannot be engineered around in two hours. The mitigation is a
 
 ## 10. Design system
 
-Night-garage instrument panel. Near-black asphalt; light exists only where energy flows, so every glow is earned by the physics. Two poles carry semantic state: amber means you are paying, cyan means you are earning. They are never decorative.
+Instrument panel, not a game skin. Near-black ground; **one accent, cyan**, and its brightness is the reading. Light exists only where energy flows.
+
+**Cyan is the only hue on the page.** Power is expressed as luminance, not as a second colour: dim cyan is low draw, full cyan is maximum, and the taper above 80% state of charge shows as cyan *losing* luminance rather than turning orange. A second accent would be the fastest way to make this look like every other dark-mode neon dashboard.
+
+**The Flip inverts, it does not recolour.** Crossing 100% swaps ground and figure: cyan-on-black becomes black-on-cyan, whole page, in one 120ms cut. It keeps the single-accent discipline, and an instrument tripping to inverse is a harder, more physical moment than a palette swap. The cable's light still reverses direction.
 
 ```css
 :root {
-  --asphalt:  #0B0E12;   /* page */
-  --panel:    #14181F;
-  --amber-1:  #FFB000;   /* charging: you pay */
-  --amber-2:  #FF6A00;   /* taper zone, hot */
-  --cyan-1:   #35E0FF;   /* V2G: you earn */
-  --monad:    #6E54FF;   /* SEE §15.1 — unresolved, do not ship blind */
-  --text:     #F2F4F8;
-  --muted:    #8A94A6;
-  --radius:   14px;
+  --ink:      #06090C;  /* page. Not #000 — pure black kills depth */
+  --surface:  #0C1216;
+  --line:     #1A252B;  /* hairlines do the grouping; cards are avoided */
+  --cyan:     #33D6E0;  /* the only accent */
+  --cyan-dim: #17727A;  /* low draw, inactive, axis labels */
+  --cyan-hot: #A8F4F8;  /* peak draw only. Never a glow, only a lightness */
+  --text:     #DFE9ED;  /* off-white */
+  --muted:    #6E828A;
+  --monad:    #6E54FF;  /* attribution only — see §15.1, still unresolved */
+  --radius:   4px;      /* near-square. Soft corners read as consumer app */
   --space:    8px;
+}
+
+/* Inverted, for the V2G phase only. */
+[data-phase='v2g'] {
+  --ink:      #33D6E0;
+  --surface:  #2AC3CD;
+  --line:     #0C1216;
+  --cyan:     #06090C;
+  --text:     #06090C;
+  --muted:    #0C4A50;
 }
 ```
 
-Single dark theme. A bright room and scratched screens mean maximum contrast wins; there is no light mode and no theme toggle.
+**What this palette must not become.** No neon outer glows, no `filter: blur()` bloom, no cyan-to-purple gradients, no glassmorphism panels, no gradient text, no coloured status dots as decoration. Cyan on black is one screenshot away from looking like every AI-generated "crypto dashboard", and the difference is entirely restraint: hairlines instead of cards, luminance instead of extra hues, and type doing the hierarchy work.
+
+Single dark theme, locked. A bright room and scratched screens mean maximum contrast wins; there is no light mode and no toggle.
 
 **Type:** system UI for prose. Every number in `ui-monospace` with `font-variant-numeric: tabular-nums`. Money is an instrument reading, not an arcade score, and digits must not jitter as they tick.
 
