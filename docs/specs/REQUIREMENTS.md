@@ -151,6 +151,7 @@ The system's primary actors are machines. This is a defining property, not an ac
 | **ASM-3** | Venue wifi is usable but unreliable. | §12 fallback ladder governs |
 | **ASM-4** | Public RPC sustains at least a few transactions per second. | Batched settlement (M5) becomes mandatory rather than preferred |
 | **ASM-5** | Reviewers accept a simplified handshake as "modelled on" ISO 15118. | Weaken the claim in the pitch, not the code |
+| **ASM-6** | Signature verification against the metering key happens off-chain, in the relay (M5), not per-signature in the M4 contract — on-chain verification of every tick from every concurrent session would exceed gas/RPC budget. The relay is therefore a **named trust boundary**: the contract trusts the relay's attestation that it checked each signature, it does not re-check them itself. | If this trust boundary is unacceptable to a reviewer, the fallback is to state it as the explicit production gap it is (e.g. a ZK-proof of the signature batch submitted on-chain) rather than attempt on-chain verification today. See NFR-M-4. |
 
 ---
 
@@ -297,15 +298,21 @@ Format: **UC-n · Name** — actors, preconditions, main flow, alternates, postc
 **Main flow**
 1. A surge is scheduled a short time in the future, against server time.
 2. Every connected phone begins simultaneously.
-3. Room-total power crosses a marked threshold on the wall.
+3. **Simulated sessions (M6) ramp down proportionally as audience sessions connect**, so peak concurrency during the surge stays at or below the rehearsed RPC safety limit rather than adding audience load on top of the full simulated load. The surge is a *substitution* of load, not an addition to it.
+4. Room-total power crosses a marked threshold on the wall.
 **Alternates**
 - *2a* No phones connected → the wall carries the beat with simulated load and the operator's script does not change.
-**Postconditions** The throughput claim is demonstrated by the audience rather than asserted by the presenter.
+- *3a* Audience sessions exceed the safety limit on their own → additional simulated sessions are not spawned to compensate; excess audience connections queue or are capped, stated on the wall (FR-DASH-6/NFR-R-3 style labelling), rather than silently pushing concurrency past the rehearsed limit.
+**Postconditions** The throughput claim is demonstrated by the audience rather than asserted by the presenter, without exceeding the concurrency ceiling established by NFR-P-2/IF-10.
+
+*Gap closed 2026-08-08: the un-reconciled prior version implied 50 rehearsed simulated sessions (NFR-P-2) plus a ~60-phone surge burst (IF-10) could co-occur, i.e. a peak of ~110 — well past the point RSK-1 already names as the worst failure mode. The fix is architectural (substitution, not addition), not just a relabelling of numbers.*
 
 ### UC-11 · Register a vehicle or station identity
 **Actors** A1, A2 · **Main flow** An identity is bound to a wallet address in the registry, so a later handshake resolves to a payable address.
 **Alternates** *1a* Duplicate registration → rejected.
 **Postconditions** The handshake step and the payment step are cryptographically linked, so a spoofed station cannot redirect payment.
+
+**Gap closed 2026-08-08 — bootstrapping order:** M6's simulated vehicle/station pairs (up to 50, per NFR-P-2) MUST NOT be registered live during spin-up (UC-5) — registering dozens of identities as on-chain transactions at the moment the operator triggers "spin up" would itself consume RPC headroom right before the demo needs it most. A pool of pre-registered identities (sized to at least the rehearsed-plus-stretch concurrency target) MUST be registered during deployment/setup, before code freeze, and UC-5's spawner draws from that pool rather than registering on demand. Booth-app sessions (FR-BOOTH-9) are the one exception, registering live at a low, audience-paced rate, not in a spin-up burst.
 
 ### UC-12 · Handle a mid-session rate change
 **Actors** A4, A2 · **Main flow** A new rate is published; the session records the change; ticks before it settle at the old rate and ticks after at the new one.
@@ -355,7 +362,7 @@ Format: **UC-n · Name** — actors, preconditions, main flow, alternates, postc
 | ID | Requirement | Pri | Ver |
 |---|---|---|---|
 | FR-SET-1 | A session MUST record payer, payee, price, direction, and start time. | M | I |
-| FR-SET-2 | Value MUST move only in response to a validated signed metering event. **This is the security core of the system.** | M | T |
+| FR-SET-2 | Value MUST move only in response to a validated signed metering event. **This is the security core of the system.** Validation happens off-chain in the relay (M5), which is a named trust boundary — see ASM-6. The pitch language must say "verifies," not "trustlessly verifies on-chain." | M | T |
 | FR-SET-3 | Settled value MUST equal metered energy × applicable price, to the tick. | M | T |
 | FR-SET-4 | A session MUST close when readings stop, within a configurable threshold. | M | D |
 | FR-SET-5 | Closing MUST NOT require a separate reconciliation or invoice transaction. The last settled state is final. | M | I |
@@ -372,7 +379,7 @@ Format: **UC-n · Name** — actors, preconditions, main flow, alternates, postc
 |---|---|---|---|
 | FR-REL-1 | The relay MUST submit settlements for all active sessions without requiring one funded wallet per session. | M | I |
 | FR-REL-2 | The relay MUST support aggregating many sessions' ticks into one transaction per interval. | M | D |
-| FR-REL-3 | The relay MUST manage nonces so concurrent submissions do not collide or stall. | M | T |
+| FR-REL-3 | The relay MUST manage nonces so submissions do not collide or stall. Given FR-REL-2's batching (one transaction per interval per hot wallet), this is a serialised-pipeline concern — the next batch MUST NOT be submitted until the previous one is confirmed or explicitly abandoned — not general concurrent-multi-transaction nonce management. Do not build more than this. | M | T |
 | FR-REL-4 | On RPC failure or rate limiting, the relay MUST degrade — larger batches or lower cadence — rather than dropping sessions silently. | M | D |
 | FR-REL-5 | The relay MUST expose its current mode so the dashboard can state it. | M | I |
 | FR-REL-6 | The relay MUST accept energy deltas from booth-app sessions through the same interface as simulated ones. | S | T |
@@ -387,6 +394,7 @@ Format: **UC-n · Name** — actors, preconditions, main flow, alternates, postc
 | FR-SIM-3 | Each simulated session MUST have an independent charge curve, so the wall does not show synchronised clones. | M | D |
 | FR-SIM-4 | The spawner MUST be able to run at a rehearsed conservative N and a higher stress N. | S | D |
 | FR-SIM-5 | Sessions SHOULD start staggered rather than simultaneously, to avoid a self-inflicted RPC spike. | S | I |
+| FR-SIM-6 | Simulated vehicle/station identities MUST be drawn from a pool registered before code freeze (UC-11 bootstrapping note), not registered live during spin-up (UC-5). | M | I |
 
 ### M7 — Operations dashboard
 
@@ -399,7 +407,7 @@ Format: **UC-n · Name** — actors, preconditions, main flow, alternates, postc
 | FR-DASH-5 | The dashboard MUST be legible from ten metres on a projector. | M | D |
 | FR-DASH-6 | The dashboard MUST show whether it is displaying on-chain or simulated values, and never present one as the other. | M | I |
 | FR-DASH-7 | The dashboard MUST render at least 60 concurrent nodes without dropping below a readable frame rate. | S | T |
-| FR-DASH-8 | The dashboard MUST NOT depend on a single long-lived connection that expires mid-demo. | M | A |
+| FR-DASH-8 | The dashboard MUST tolerate a dropped connection gracefully: it MUST use a reconnect-safe streaming transport (e.g. Server-Sent Events, or a WebSocket with aggressive client-side auto-reconnect) and MUST NOT require a page reload or show a frozen-but-live-looking state if the connection drops. (Originally worded as a blanket ban on long-lived connections — corrected: the actual intent is resilience against venue wifi drops, not avoiding streaming transports, since polling at demo-relevant frequency would overload the relay itself.) | M | A |
 | FR-DASH-9 | The dashboard SHOULD link a settlement to its transaction on a block explorer. | S | D |
 | FR-DASH-10 | The dashboard MUST open on an idle state and become live on operator action, so the transition is visible. | M | D |
 
@@ -407,27 +415,31 @@ Format: **UC-n · Name** — actors, preconditions, main flow, alternates, postc
 
 Full design: `docs/specs/2026-08-08-booth-frontend-design.md`. Requirements here are the system-level obligations only.
 
+Priority split (corrected — see traceability note below): FR-BOOTH-1/2/4 are *existence* requirements on a module §11 explicitly builds last and says "is the only module whose absence costs nothing on stage" — they cannot simultaneously be M. FR-BOOTH-5/6/7/8 are *conditional constraints*: they don't require M8 to exist, but if it does exist, violating them is not acceptable at any priority. They stay M for that reason, not because the module is guaranteed to ship.
+
 | ID | Requirement | Pri | Ver |
 |---|---|---|---|
-| FR-BOOTH-1 | A participant MUST reach a playable state from QR scan with no install, no login, and no wallet. | M | D |
-| FR-BOOTH-2 | The app MUST NOT block on the network at any point, and MUST NOT display a network error to a participant. | M | D |
+| FR-BOOTH-1 | A participant MUST reach a playable state from QR scan with no install, no login, and no wallet. | S | D |
+| FR-BOOTH-2 | The app MUST NOT block on the network at any point, and MUST NOT display a network error to a participant. | S | D |
 | FR-BOOTH-3 | The app MUST report energy deltas to the relay through the M5 interface. | S | T |
-| FR-BOOTH-4 | The app MUST remain fully playable with the relay unreachable. | M | D |
+| FR-BOOTH-4 | The app MUST remain fully playable with the relay unreachable. | S | D |
 | FR-BOOTH-5 | The app MUST NOT collect credentials, private keys, or payment details. | M | I |
 | FR-BOOTH-6 | Any participant reward MUST be decided by skill, never by a randomly assigned attribute. | M | I |
 | FR-BOOTH-7 | Reward terms MUST be stated in the app before a participant plays. | M | I |
 | FR-BOOTH-8 | The app MUST NOT reference voting, judging, or the team's placement anywhere. | M | I |
+| FR-BOOTH-9 | On load, the app MUST generate an ephemeral session key client-side and silently register it (UC-11) before the first energy delta is reported — a participant MUST NOT be asked to hold or manage a key. This resolves the gap where FR-MET-3 requires every reading to be signed but FR-BOOTH-5 forbids collecting keys from the participant. | S | D |
 
 ### M9 — Demo control & observability
 
 | ID | Requirement | Pri | Ver |
 |---|---|---|---|
 | FR-OPS-1 | The operator MUST be able to start the network with one deterministic action. | M | D |
-| FR-OPS-2 | The operator MUST be able to trigger a room surge that reaches connected phones. | S | D |
+| FR-OPS-2 | The operator MUST be able to trigger a room surge that reaches connected phones. Triggering it MUST ramp down concurrently-running simulated sessions (M6) proportionally, so peak concurrency during the surge never exceeds the rehearsed RPC safety limit (UC-10). | S | D |
 | FR-OPS-3 | The operator MUST be able to force degraded mode, to rehearse it. | S | D |
 | FR-OPS-4 | The system MUST run the full demo beat with zero phones connected. | M | D |
 | FR-OPS-5 | A recorded fallback of the working system MUST exist before code freeze. | M | I |
 | FR-OPS-6 | Logs MUST retain enough detail to answer "did that settlement really land on chain" after the fact. | S | I |
+| FR-OPS-7 | The operator surface MUST include a control that submits one deliberately malformed/unsigned settlement on demand, so UC-7/AC-7 can be proven live if a reviewer asks, rather than relying on an automated adversarial test harness nobody has time to build. | S | D |
 
 ---
 
@@ -462,18 +474,18 @@ Signed payload. Signature covers the whole struct.
 { sessionId, seq, timestampMs, kW, whDelta, meterId, signature }
 ```
 
-- **IF-1** The consumer MUST verify `signature` against the registered `meterId` key before any value moves.
+- **IF-1** The consumer MUST verify `signature` against the registered `meterId` key before any value moves. **The consumer is the relay (M5), off-chain, not the M4 contract per-signature** — see ASM-6. The contract trusts the relay's batch submission as an attestation that this check already happened.
 - **IF-2** `seq` MUST increase monotonically per session.
 - **IF-3** `whDelta` MAY be negative, which denotes discharge.
 
 ### 7.2 Relay → Chain
 
-- **IF-4** A batch submission MUST carry an array of per-session deltas and settle them atomically.
+- **IF-4** A batch submission MUST carry an array of per-session **energy deltas (`whDelta`)**, not pre-computed MON amounts, and settle them atomically. The M4 contract, not the relay, MUST perform `whDelta × price` on-chain against the registered rate — the relay attests to signature validity (ASM-6) but never dictates the settled MON amount, which is what keeps FR-SET-3 true rather than merely asserted by an off-chain party.
 - **IF-5** A partial batch failure MUST NOT settle any entry in that batch.
 
 ### 7.3 Chain → Dashboard
 
-- **IF-6** Settlement events MUST be consumable without a WebSocket subscription, because the dashboard cannot depend on a long-lived connection (FR-DASH-8).
+- **IF-6** Settlement events MUST be consumable via a reconnect-safe streaming transport (SSE recommended for native browser auto-reconnect) rather than high-frequency polling, and the dashboard MUST recover without a reload if that connection drops (FR-DASH-8).
 - **IF-7** Every rendered figure MUST be traceable to an event or an explicit simulation flag.
 
 ### 7.4 Booth app → Relay
@@ -542,6 +554,7 @@ Defined in `2026-08-08-booth-frontend-design.md` §8. System-level obligations:
 | NFR-M-1 | Every simplification against the real standards is documented in the README. | I |
 | NFR-M-2 | Contract source is verifiable against the deployed address. | I |
 | NFR-M-3 | The repository is public and the deployment is operational on Monad testnet (CON-2). | I |
+| NFR-M-4 | The signature-verification trust boundary (ASM-6: off-chain in the relay, not per-signature on-chain) is stated explicitly in the README and in the pitch, alongside the named production path (e.g. a ZK-proof of the verified batch submitted on-chain) that would close it. | I |
 
 ---
 
@@ -578,7 +591,7 @@ The system is done when all of these hold. Anything unmet is stated plainly rath
 | AC-4 | A V2G session pays the vehicle using the same path with the sign flipped. | D |
 | AC-5 | At least ten concurrent sessions settle live, with both directions running. | D |
 | AC-6 | The wall shows the feed, the counters, the node view, and the split. | D |
-| AC-7 | A settlement without a signed reading is refused. | T |
+| AC-7 | A settlement without a signed reading is refused. | D — via FR-OPS-7, not an automated harness; see note below |
 | AC-8 | The demo survives forced RPC degradation. | D |
 | AC-9 | The contracts are deployed and verifiable on Monad testnet; the repository is public. | I |
 | AC-10 | A recorded fallback exists. | I |
@@ -639,6 +652,20 @@ Two further items originate in this document:
 |---|---|---|
 | OD-1 | Are booth-app sessions settled on-chain, or reported to the wall only? | FR-BOOTH-3, FR-REL-6 |
 | OD-2 | Pre-provisioned wallets, or identities derived live from the handshake? | FR-ID-7 |
+
+### 13.2 Gaps found and closed against this baseline (2026-08-08, adversarial review with Gemini 3.1 Pro)
+
+| Gap | Resolution | Where it lives |
+|---|---|---|
+| Signature verification location undefined; on-chain-per-tick is infeasible at target concurrency | Named as a trust boundary: relay (M5) verifies off-chain, contract trusts the relay's attestation | ASM-6, FR-SET-2, IF-1, NFR-M-4 |
+| Booth app has no key but FR-MET-3 requires every reading signed | Ephemeral client-side key, silently registered on load | FR-BOOTH-9 |
+| FR-BOOTH-1/2/4/5/6/7/8 all marked M despite M8 being built last with "absence costs nothing" | Split: playability requirements (1/2/4) downgraded to S; standing constraints (5/6/7/8) stay M as conditional ("if it ships, these are non-negotiable") | M8 table |
+| FR-DASH-8/IF-6 banned long-lived connections, which forces high-frequency polling that would overload the relay | Reworded to require a reconnect-safe streaming transport (SSE/WS with auto-reconnect), not a ban on streaming itself | FR-DASH-8, IF-6 |
+| NFR-P-2 (50 simulated) and IF-10 (60-phone surge) were never reconciled — additive reading implies a ~110 peak, past RSK-1's named worst failure mode | Surge substitutes for simulated load rather than adding to it; excess is capped and labelled, not silently allowed through | UC-10, FR-OPS-2 |
+| AC-7 marked **T** with no automated adversarial harness realistically buildable today | Changed to **D**, backed by a new operator control that submits one deliberately malformed reading on demand | AC-7, FR-OPS-7 |
+| IF-4 left ambiguous whether the relay or the contract computes MON from energy — if the relay computes it, FR-SET-3 is asserted, not enforced | Contract does `whDelta × price` on-chain from a relay-submitted energy delta, never a relay-submitted MON amount | IF-4 |
+| FR-REL-3 (nonce management) implied general concurrent-tx handling that contradicts FR-REL-2's single-batch-per-interval model | Scoped down to serialised-pipeline nonce handling only | FR-REL-3 |
+| No pre-registration step specified for M6's simulated identities; registering ~50 identities live during spin-up would burn RPC headroom right before the demo needs it | Pool of identities registered during deployment, before code freeze; spin-up draws from the pool | UC-11, FR-SIM-6 |
 
 ---
 
