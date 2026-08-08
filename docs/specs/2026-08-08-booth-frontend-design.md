@@ -192,6 +192,20 @@ Results: energy moved, MON paid and earned, rank, and the car's spec plate. One 
 
 Leaderboard: top 10, the player's own row pinned and highlighted even when outside the top 10, and the reward terms panel (§7). Polls `/api/leaderboard` every 5s while visible, never while charging.
 
+### 3.8 The public leaderboard screen and the seal
+
+A second surface, separate from the phone: a large screen at the booth showing the live standings all day. It is what makes the contest feel like a contest rather than sixty private games.
+
+**The seal.** Ten seconds before the contest closes, the public screen goes dark and shows `FINAL STANDINGS SEALED`. From that moment nobody in the room can see who won, or what score they would have needed to beat. Players keep their own score on their own phone; nothing else is visible.
+
+**The reveal happens later, in Discord**, not at the venue. Three things follow from that, and they are the reason this design is stronger than announcing on the day:
+
+- Nobody can target the top score in the closing seconds, because nobody can see it.
+- The team reviews the final list before publishing it, with no clock pressure and no audience (§6).
+- The result gives the project a reason to exist after the event, which a leaderboard announced and forgotten in the room does not.
+
+**Requirements on the screen:** legible across a busy room; updates at least every 5s; shows the seal state unambiguously rather than merely freezing, so a stale screen is never mistaken for a live one.
+
 ---
 
 ## 4. The car system
@@ -305,12 +319,16 @@ Real money on a public tap leaderboard. Treat the client as hostile.
 | Clock manipulation | Server stamps start and end; client `t` is advisory | Yes, cheap |
 | Interval-variance analysis | Flag near-zero variance between taps | No. Theatre at this scale |
 
-**The honest consequence.** Without server-side recompute, a determined developer in the audience — and this room is full of them — can POST an arbitrary score. Two ways to close it, in §15 as an open decision:
+**The honest consequence, and why it is smaller than it looks.** Without server-side recompute, anyone can send an arbitrary score straight to the endpoint. In a room of sixty developers that is a realistic thing to happen, not a theoretical one.
 
-- **Build the recompute** (~25 min, pushes something else to P1), or
-- **Adjudicate the prize from a witnessed run.** The public leaderboard is for glory; the payout is decided by a short run played at the booth in front of a team member. Zero cheating surface, zero build time, and it pulls people physically to the table.
+It matters much less here because of the reveal design (§3.8): winners are never announced at the venue. The standings seal before the contest closes and are published afterwards in Discord. **Detection therefore does not have to be real-time — it only has to happen before a name is announced**, which removes the failure everyone fears, where a faked score wins publicly and the team has to argue about paying it in front of the room.
 
-The second is recommended. It costs nothing and it is strictly more robust.
+**The defence, in two parts:**
+
+1. **A plausibility ceiling.** The game was simulated to balance it (§5), so its physical maximum is known: a superhuman 20 taps per second yields about 3,732, and no tap rate reaches beyond roughly 3,950. Any score above **4,200** did not come from playing. Reject or flag it on submission — two lines, not a rebuild.
+2. **Review before announcing.** Sort the final list before publishing to Discord. A fabricated entry sits so far outside the real distribution that it is obvious by eye, and there is no clock pressure while doing it.
+
+Server-side recompute (P1) remains the stronger defence and is worth building if the booth app finishes early. It is no longer required to protect the prize.
 
 ---
 
@@ -320,17 +338,19 @@ The team's intent: top 10 players share 20% of any cash prize won.
 
 **One problem to name plainly.** The people playing are the same people who cast the votes that decide whether the prize exists. A payout conditional on the team placing is, structurally, a payment contingent on the voters' own behaviour. Nobody is likely to accuse the team of anything, but the fix is cheap enough that there is no reason to carry the ambiguity.
 
-**Recommended: an unconditional pot.** The team commits a fixed amount paid regardless of where the project places. It removes the contingency entirely, it is simpler to explain, and it is a better hook, because players do not have to believe the team will win in order to care.
+**Decision, 2026-08-08: the conditional prize share.** The team pays 20% of any cash prize won, split across the top 10. An unconditional pot was offered and declined. Table A below is therefore the active one.
+
+Because the payout depends on placing, **the condition must be stated up front**. Disclosure is the whole mitigation here: a player who reads the terms before playing knows exactly what is and is not promised, and nothing is hidden that could later look like it was.
 
 **Terms panel copy, final:**
 
-> **Top 10 share £100.** Paid after the event to the ten highest scores, whatever happens with the judging. Play as often as you like; your best run counts. Winners are listed here and paid by the team at the venue.
+> **Top 10 share 20% of any cash prize we win.** That's £240 split ten ways if we place first, and nothing if we don't place at all. Play as often as you like; your best run counts. Winners are listed here and paid by the team at the venue.
 
-**What the app must never say:** anything connecting the reward to voting, the judging, or the team placing. No "vote for us", no "if we win" — not in copy, not on a share card, not spoken at the booth.
+**What the app must never say:** anything asking a participant to vote for the project or to influence the judging. No "vote for us", no "help us win", not in copy, not on a share card, not spoken at the booth. Stating the payout condition as fact is required; trading on it is not (FR-BOOTH-8).
 
 **Payout tables.** Each sums exactly to its pot.
 
-| Rank | A: £240 pot, top 10 | B: £240 pot, top 5 | C: £100 unconditional, top 10 ★ |
+| Rank | A: £240 pot, top 10 ★ active | B: £240 pot, top 5 | C: £100 unconditional, top 10 |
 |---|---|---|---|
 | 1 | 60 | 80 | 25 |
 | 2 | 45 | 60 | 18 |
@@ -586,7 +606,7 @@ Everything else in this document is decided. These five are not, and each blocks
 
 1. **Monad purple: `#6E54FF` or `#836EF9`?** Blocks the tokens file, which is the first P0 task. Someone opens `monad.xyz/brand-and-media-kit` and reads the value off the page. Two minutes.
 2. **Reward: unconditional £100 pot, or 20% of winnings?** §7 recommends unconditional. Blocks the terms panel copy.
-3. **Prize adjudication: public leaderboard, or a witnessed run at the booth?** §6 recommends witnessed. It decides whether server-side recompute has to move from P1 into P0.
+3. ~~**Prize adjudication.**~~ **RESOLVED 2026-08-08.** Live public screen all day, sealed 10 seconds before the contest closes, winners revealed afterwards in Discord. Protected by a plausibility ceiling of 4,200 plus review before announcing (§3.8, §6). Server-side recompute stays P1 and is no longer required to protect the prize.
 4. **Who writes the four API endpoints** — the frontend developer inside the 120 minutes, or the backend developer as part of the dashboard work? The 12-minute P0 line item assumes the frontend developer writes only the client.
 5. **Does the wall connect to the chain at all today?** §8 gives the relay-owned batching design. It is the backend developer's call and nothing in this app depends on the answer.
 

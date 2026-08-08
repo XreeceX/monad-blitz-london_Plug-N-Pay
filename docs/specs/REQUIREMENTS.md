@@ -377,13 +377,15 @@ Format: **UC-n · Name** — actors, preconditions, main flow, alternates, postc
 
 | ID | Requirement | Pri | Ver |
 |---|---|---|---|
-| FR-REL-1 | The relay MUST submit settlements for all active sessions without requiring one funded wallet per session. | M | I |
-| FR-REL-2 | The relay MUST support aggregating many sessions' ticks into one transaction per interval. | M | D |
-| FR-REL-3 | The relay MUST manage nonces so submissions do not collide or stall. Given FR-REL-2's batching (one transaction per interval per hot wallet), this is a serialised-pipeline concern — the next batch MUST NOT be submitted until the previous one is confirmed or explicitly abandoned — not general concurrent-multi-transaction nonce management. Do not build more than this. | M | T |
+| FR-REL-1 | The relay MUST submit **one transaction per session per tick**. This is the primary architecture, decided 2026-08-08 (§13.1, resolves Q2). | M | D |
+| FR-REL-2 | The relay SHOULD support aggregating many sessions' ticks into one transaction per interval, as the **fallback** if measured RPC capacity proves insufficient (FR-REL-9). | S | D |
+| FR-REL-3 | The relay MUST manage nonces so submissions do not collide or stall. **The shape of this depends on which mode is running, and the two are not the same job.** Under FR-REL-1 (per-tick, primary) it is genuine parallel nonce management across a wallet pool (FR-REL-8), because many transactions per second cannot be issued from one sequential account. Under FR-REL-2 (batched, fallback) it collapses to a serialised pipeline — the next batch is not submitted until the previous confirms or is abandoned — and nothing more should be built. Build for the mode in play. | M | T |
 | FR-REL-4 | On RPC failure or rate limiting, the relay MUST degrade — larger batches or lower cadence — rather than dropping sessions silently. | M | D |
 | FR-REL-5 | The relay MUST expose its current mode so the dashboard can state it. | M | I |
 | FR-REL-6 | The relay MUST accept energy deltas from booth-app sessions through the same interface as simulated ones. | S | T |
 | FR-REL-7 | The relay MUST NOT hold or require any participant's private key beyond its own hot wallet. | M | I |
+| FR-REL-8 | Because one account's transactions are processed in nonce order, the relay MUST submit from a **pool of funded wallets**, sized so the target transactions per second can be issued in parallel rather than queued behind a single nonce. This makes the faucet a harder dependency than ASM-1 assumed. | M | T |
+| FR-REL-9 | Before committing build time to the per-tick path, the team MUST measure the public RPC's actual sustained transaction rate and record the number. An undocumented limit MUST be converted into a measured one. | M | T |
 
 ### M6 — Simulator & spawner
 
@@ -426,8 +428,12 @@ Priority split (corrected — see traceability note below): FR-BOOTH-1/2/4 are *
 | FR-BOOTH-5 | The app MUST NOT collect credentials, private keys, or payment details. | M | I |
 | FR-BOOTH-6 | Any participant reward MUST be decided by skill, never by a randomly assigned attribute. | M | I |
 | FR-BOOTH-7 | Reward terms MUST be stated in the app before a participant plays. | M | I |
-| FR-BOOTH-8 | The app MUST NOT reference voting, judging, or the team's placement anywhere. | M | I |
+| FR-BOOTH-8 | The app MUST NOT solicit votes or ask a participant to influence the judging in any way. It MUST state the reward's dependency on the team placing, as fact, because FR-BOOTH-7 requires complete terms and a hidden condition is worse than a disclosed one. Amended 2026-08-08 when the conditional reward was chosen — see §13.1. | M | I |
 | FR-BOOTH-9 | On load, the app MUST generate an ephemeral session key client-side and silently register it (UC-11) before the first energy delta is reported — a participant MUST NOT be asked to hold or manage a key. This resolves the gap where FR-MET-3 requires every reading to be signed but FR-BOOTH-5 forbids collecting keys from the participant. | S | D |
+| FR-BOOTH-10 | A public leaderboard screen MUST show live standings at the booth, legible across a busy room, updating at least every 5 s. | S | D |
+| FR-BOOTH-11 | The public screen MUST seal 10 s before the contest closes, showing an unambiguous sealed state rather than merely freezing, so a stale screen cannot be mistaken for a live one. | S | D |
+| FR-BOOTH-12 | Final standings MUST be reviewed before publication and revealed after the event, not at the venue. | M | I |
+| FR-BOOTH-13 | Submitted scores above the game's simulated physical maximum (4,200) MUST be rejected or flagged, since no sequence of taps can reach it. | M | T |
 
 ### M9 — Demo control & observability
 
@@ -634,7 +640,7 @@ Blocking items live in `docs/idea/open_questions.md` and are not duplicated here
 | Open question | Requirements waiting on it |
 |---|---|
 | Q1 · Dedicated RPC endpoint? | FR-REL-2, FR-REL-4, NFR-P-2 |
-| Q2 · Per-tick calls or batched aggregation as primary? | FR-SET-6, FR-SET-9, FR-REL-1..3 — this decides contract signatures and the dashboard's event schema, so it must be settled before contract code is written |
+| ~~Q2 · Per-tick calls or batched aggregation as primary?~~ | **RESOLVED 2026-08-08: per-tick, one transaction per session per tick.** Batching demoted to fallback. See FR-REL-1, FR-REL-2, and §13.3. |
 | ~~Q3 · Target concurrency N?~~ | **RESOLVED 2026-08-08: rehearse at 10, attempt 50.** Recorded in NFR-P-2 and AC-5. `open_questions.md` still reads "Unresolved" and is now stale on this point. |
 
 ### 13.1 Decisions recorded against this baseline
@@ -645,6 +651,11 @@ Blocking items live in `docs/idea/open_questions.md` and are not duplicated here
 | Booth app build position | Last, after the core modules | §11 build order |
 | Driver-facing screen | None. A6 stays screenless | §2.3, no UI requirement |
 | Honesty constraints strength | All three remain MUST | FR-BOOTH-6, FR-BOOTH-8, FR-MET-5 |
+| Primary settlement architecture | One transaction per session per tick. Batching is the fallback. Resolves Q2 | FR-REL-1, FR-REL-2, §13.3 |
+| Booth player reward | 20% of any cash prize won, top 10, conditional on the team placing. Unconditional pot declined | Booth spec §7, table A |
+| FR-BOOTH-8 scope | Amended: soliciting votes stays banned; stating the payout's dependency on placement is now required | FR-BOOTH-8, FR-BOOTH-7 |
+| Contest reveal | Public screen live all day, sealed 10 s before close, winners revealed later in Discord | FR-BOOTH-10..12, booth spec §3.8 |
+| Booth cheat defence | Plausibility ceiling of 4,200 plus review before announcing. Server-side recompute stays P1 | FR-BOOTH-13, booth spec §6 |
 
 Two further items originate in this document:
 
@@ -666,6 +677,20 @@ Two further items originate in this document:
 | IF-4 left ambiguous whether the relay or the contract computes MON from energy — if the relay computes it, FR-SET-3 is asserted, not enforced | Contract does `whDelta × price` on-chain from a relay-submitted energy delta, never a relay-submitted MON amount | IF-4 |
 | FR-REL-3 (nonce management) implied general concurrent-tx handling that contradicts FR-REL-2's single-batch-per-interval model | Scoped down to serialised-pipeline nonce handling only | FR-REL-3 |
 | No pre-registration step specified for M6's simulated identities; registering ~50 identities live during spin-up would burn RPC headroom right before the demo needs it | Pool of identities registered during deployment, before code freeze; spin-up draws from the pool | UC-11, FR-SIM-6 |
+
+### 13.3 Consequences of the per-tick decision
+
+One transaction per session per tick was chosen over bundling for the stronger claim: separate transactions, no aggregation, nothing hidden. Three things follow, and none are optional.
+
+**A pool of wallets, not one.** A single account's transactions are processed in nonce order, so one wallet cannot issue many per second in parallel — they queue behind each other. The relay needs several funded wallets submitting concurrently (FR-REL-8). This makes ASM-1 harder than it looked: the faucet must fund a pool, and its own limits are unverified.
+
+**The RPC limit must be measured, not assumed.** No published figure exists for the public testnet endpoint. Send transactions at a rising rate and find where it starts refusing (FR-REL-9). That turns the project's largest unknown into a number, in minutes.
+
+**Load scales with concurrency, so the rehearsed number carries the demo.** At the acceptance bar of ten sessions this is ten transactions a second, a far smaller bet than fifty. The fifty-session attempt is a stretch target, not a pass condition (AC-5). If the measurement comes back below what the stretch needs, run the stretch from a recording.
+
+**Open tension with §13.2.** The adversarial review scoped FR-REL-3 down to serialised-pipeline nonce handling and said to build nothing more. That reasoning assumed batching was primary. The per-tick decision reinstates the parallel-nonce work it ruled out. FR-REL-3 now covers both modes explicitly, but the two conclusions were reached from different premises and the reviewer has not seen the newer decision.
+
+**Reversal trigger.** If measured capacity cannot sustain ten sessions with headroom, switch to FR-REL-2 batching — and FR-REL-3 collapses back to the simpler serialised form. Make that call on the measurement, early, not on stage.
 
 ---
 
