@@ -59,7 +59,10 @@ A QR that says `localhost` only works on your laptop. Deploy once, then **always
 host from the Render URL**.
 
 1. [dashboard.render.com](https://dashboard.render.com) → **New → Blueprint**
-2. Connect `XreeceX/monad-blitz-london_Plug-N-Pay` → Apply `render.yaml`
+2. Connect `XreeceX/monad-blitz-london_Plug-N-Pay`, pick branch `demo/render-booth`
+   → Apply `render.yaml`. The blueprint pins that branch and `rootDir: booth`, so
+   this demo deploys on its own — separate from `main` and from wherever the
+   webpage and backend are hosted.
 3. Wait for `plug-n-pay-booth` to go live
 4. Open **that** URL on the projector → **OPEN HOST LOBBY**
 5. Phones scan the QR (it uses Render’s `RENDER_EXTERNAL_URL` automatically)

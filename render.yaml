@@ -3,12 +3,20 @@
 #
 # After deploy, open the service's public URL (e.g. https://plug-n-pay-booth.onrender.com)
 # and host from THERE. The QR uses RENDER_EXTERNAL_URL so phones can join from anywhere.
+#
+# This service deploys the booth demo only (rootDir: booth) off the demo branch.
+# The webpage and backend are hosted elsewhere; changes outside booth/ do not
+# trigger a build here.
+#
+# Free plan spins the instance down after ~15 min idle and cold-starts slowly.
+# Open the URL a few minutes before the demo so the first phone doesn't wait.
 
 services:
   - type: web
     name: plug-n-pay-booth
     runtime: node
     plan: free
+    branch: demo/render-booth
     rootDir: booth
     buildCommand: npm ci && npm run build
     startCommand: npm start
