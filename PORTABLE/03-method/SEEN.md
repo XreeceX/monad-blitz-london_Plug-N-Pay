@@ -20,7 +20,7 @@ Pixel Paywall · HotPotatoMON · Proof of Jump (whole-room jumping, zone TPS)
 ## The 4 written up in docs/
 
 - **Reverse Turk** — the champion. 61/80. Agent with a wallet hires the room, pays per task.
-- **Amber Current** — EV charging per-second streaming payments + V2G. 37/80.
+- **Plug-N-Pay** (formerly Amber Current) — EV charging per-second streaming payments + V2G. 37/80.
 - **Athena-lite** — forum claims become on-chain replication bounties. 42/80.
 - **SimCityL1** — fully on-chain agent city, GDP = TPS. 39/80.
 

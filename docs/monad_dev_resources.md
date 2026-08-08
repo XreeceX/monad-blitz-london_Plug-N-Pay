@@ -339,7 +339,7 @@ Ask at venue check-in for any **Blitz-specific** mentor Discord / staff channel 
 
 | Folder | Idea |
 |---|---|
-| [`docs/idea/`](idea/) | Amber Current — per-second EV / V2G streaming payments |
+| [`docs/idea/`](idea/) | Plug-N-Pay — per-second EV / V2G streaming payments |
 | [`docs/idea_simCity/`](idea_simCity/) | SimCityL1 — civic agent city; GDP = TPS |
 | [`docs/idea_athena/`](idea_athena/) | Athena-lite — forum claims → replication bounties |
 | [`docs/idea_reverseTurk/`](idea_reverseTurk/) | Reverse Turk — AI agent hires the room, pays MON to phones |

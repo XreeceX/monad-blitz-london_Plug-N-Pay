@@ -1,10 +1,10 @@
-# Amber Current — Software Requirements Specification
+# Plug-N-Pay — Software Requirements Specification
 
 **The main requirements document.** Everything else in `docs/specs/` is subordinate to this file.
 
 | | |
 |---|---|
-| **System** | Amber Current — per-second machine-to-machine settlement for EV charging on Monad |
+| **System** | Plug-N-Pay — per-second machine-to-machine settlement for EV charging on Monad |
 | **Version** | 1.0 |
 | **Date** | 2026-08-08 |
 | **Source of truth for intent** | `docs/idea/idea.md`, `docs/idea/story.md` |
@@ -16,11 +16,11 @@
 
 ### 1.1 Purpose
 
-This document states what Amber Current must do, for whom, and how each requirement will be shown to have been met. It is written for three audiences: the people building it today, a peer reviewing the submission, and anyone picking the project up afterwards.
+This document states what Plug-N-Pay must do, for whom, and how each requirement will be shown to have been met. It is written for three audiences: the people building it today, a peer reviewing the submission, and anyone picking the project up afterwards.
 
 ### 1.2 Product scope
 
-Amber Current is a **settlement rail**. A vehicle and a charging station authenticate each other automatically on physical connection, open a payment relationship between their on-chain wallets, and move value continuously in step with metered energy — in either direction — for exactly as long as current flows. When the current stops, the obligation stops. There is no invoice step, because the last settled on-chain state already is the bill.
+Plug-N-Pay is a **settlement rail**. A vehicle and a charging station authenticate each other automatically on physical connection, open a payment relationship between their on-chain wallets, and move value continuously in step with metered energy — in either direction — for exactly as long as current flows. When the current stops, the obligation stops. There is no invoice step, because the last settled on-chain state already is the bill.
 
 The system exists to close a gap named in `idea.md` §2: the physical reality of charging is continuous, and until a ledger was fast and cheap enough to settle per second, the financial reality could not match it.
 
@@ -70,7 +70,7 @@ Priority uses MoSCoW against the 18:00 code freeze: **M** must exist to demo, **
 
 ### 2.1 Product perspective
 
-Amber Current sits between two existing standards and a chain, and invents neither end:
+Plug-N-Pay sits between two existing standards and a chain, and invents neither end:
 
 ```
    ISO 15118 Plug & Charge          OCMF signed metering
@@ -79,7 +79,7 @@ Amber Current sits between two existing standards and a chain, and invents neith
               └──────────────┬───────────────┘
                              ▼
                    ┌───────────────────┐
-                   │  AMBER CURRENT    │   ← the contribution
+                   │    PLUG-N-PAY     │   ← the contribution
                    │  settlement rail  │
                    └───────────────────┘
                              ▼
@@ -146,10 +146,10 @@ The system's primary actors are machines. This is a defining property, not an ac
 
 | ID | Assumption | If wrong |
 |---|---|---|
-| **ASM-1** | Testnet faucet supplies enough MON to fund all demo wallets. | Reduce concurrency; fund one relay wallet only |
+| **ASM-1** | Testnet faucet supplies enough MON to fund the relay's **wallet pool** (FR-REL-8) plus the pre-registered identity pool (FR-SIM-6). Per-tick settlement made this a harder dependency than the original single-wallet assumption, and the faucet's own per-request limits are unverified. | Reduce concurrency. Falling back to a single relay wallet means falling back to batching (FR-REL-2), because one account cannot issue per-tick load in parallel — the two are the same decision |
 | **ASM-2** | Simulated metering is acceptable to reviewers when labelled honestly. | Nothing changes; labelling is already required by FR-MET-5 |
 | **ASM-3** | Venue wifi is usable but unreliable. | §12 fallback ladder governs |
-| **ASM-4** | Public RPC sustains at least a few transactions per second. | Batched settlement (M5) becomes mandatory rather than preferred |
+| **ASM-4** | Public RPC sustains at least the rehearsed concurrency in transactions per second — 10/s at AC-5's bar, ~50/s for the stretch attempt. This is an assumption only until FR-REL-9 measures it. | Batching (FR-REL-2) stops being the fallback and becomes mandatory, and FR-REL-3 collapses to its serialised form |
 | **ASM-5** | Reviewers accept a simplified handshake as "modelled on" ISO 15118. | Weaken the claim in the pitch, not the code |
 | **ASM-6** | Signature verification against the metering key happens off-chain, in the relay (M5), not per-signature in the M4 contract — on-chain verification of every tick from every concurrent session would exceed gas/RPC budget. The relay is therefore a **named trust boundary**: the contract trusts the relay's attestation that it checked each signature, it does not re-check them itself. | If this trust boundary is unacceptable to a reviewer, the fallback is to state it as the explicit production gap it is (e.g. a ZK-proof of the signature batch submitted on-chain) rather than attempt on-chain verification today. See NFR-M-4. |
 
@@ -377,13 +377,15 @@ Format: **UC-n · Name** — actors, preconditions, main flow, alternates, postc
 
 | ID | Requirement | Pri | Ver |
 |---|---|---|---|
-| FR-REL-1 | The relay MUST submit settlements for all active sessions without requiring one funded wallet per session. | M | I |
-| FR-REL-2 | The relay MUST support aggregating many sessions' ticks into one transaction per interval. | M | D |
-| FR-REL-3 | The relay MUST manage nonces so submissions do not collide or stall. Given FR-REL-2's batching (one transaction per interval per hot wallet), this is a serialised-pipeline concern — the next batch MUST NOT be submitted until the previous one is confirmed or explicitly abandoned — not general concurrent-multi-transaction nonce management. Do not build more than this. | M | T |
+| FR-REL-1 | The relay MUST submit **one transaction per session per tick**. This is the primary architecture, decided 2026-08-08 (§13.1, resolves Q2). | M | D |
+| FR-REL-2 | The relay SHOULD support aggregating many sessions' ticks into one transaction per interval, as the **fallback** if measured RPC capacity proves insufficient (FR-REL-9). | S | D |
+| FR-REL-3 | The relay MUST manage nonces so submissions do not collide or stall. **The shape of this depends on which mode is running, and the two are not the same job.** Under FR-REL-1 (per-tick, primary) it is genuine parallel nonce management across a wallet pool (FR-REL-8), because many transactions per second cannot be issued from one sequential account. Under FR-REL-2 (batched, fallback) it collapses to a serialised pipeline — the next batch is not submitted until the previous confirms or is abandoned — and nothing more should be built. Build for the mode in play. | M | T |
 | FR-REL-4 | On RPC failure or rate limiting, the relay MUST degrade — larger batches or lower cadence — rather than dropping sessions silently. | M | D |
 | FR-REL-5 | The relay MUST expose its current mode so the dashboard can state it. | M | I |
 | FR-REL-6 | The relay MUST accept energy deltas from booth-app sessions through the same interface as simulated ones. | S | T |
 | FR-REL-7 | The relay MUST NOT hold or require any participant's private key beyond its own hot wallet. | M | I |
+| FR-REL-8 | Because one account's transactions are processed in nonce order, the relay MUST submit from a **pool of funded wallets**, sized so the target transactions per second can be issued in parallel rather than queued behind a single nonce. This makes the faucet a harder dependency than ASM-1 assumed. | M | T |
+| FR-REL-9 | Before committing build time to the per-tick path, the team MUST measure the public RPC's actual sustained transaction rate and record the number. An undocumented limit MUST be converted into a measured one. | M | T |
 
 ### M6 — Simulator & spawner
 
@@ -426,8 +428,12 @@ Priority split (corrected — see traceability note below): FR-BOOTH-1/2/4 are *
 | FR-BOOTH-5 | The app MUST NOT collect credentials, private keys, or payment details. | M | I |
 | FR-BOOTH-6 | Any participant reward MUST be decided by skill, never by a randomly assigned attribute. | M | I |
 | FR-BOOTH-7 | Reward terms MUST be stated in the app before a participant plays. | M | I |
-| FR-BOOTH-8 | The app MUST NOT reference voting, judging, or the team's placement anywhere. | M | I |
+| FR-BOOTH-8 | The app MUST NOT solicit votes or ask a participant to influence the judging in any way. It MUST state the reward's dependency on the team placing, as fact, because FR-BOOTH-7 requires complete terms and a hidden condition is worse than a disclosed one. Amended 2026-08-08 when the conditional reward was chosen — see §13.1. | M | I |
 | FR-BOOTH-9 | On load, the app MUST generate an ephemeral session key client-side and silently register it (UC-11) before the first energy delta is reported — a participant MUST NOT be asked to hold or manage a key. This resolves the gap where FR-MET-3 requires every reading to be signed but FR-BOOTH-5 forbids collecting keys from the participant. | S | D |
+| FR-BOOTH-10 | A public leaderboard screen MUST show live standings at the booth, legible across a busy room, updating at least every 5 s. | S | D |
+| FR-BOOTH-11 | The public screen MUST seal 10 s before the contest closes, showing an unambiguous sealed state rather than merely freezing, so a stale screen cannot be mistaken for a live one. | S | D |
+| FR-BOOTH-12 | Final standings MUST be reviewed before publication and revealed after the event, not at the venue. | M | I |
+| FR-BOOTH-13 | Submitted scores above the game's simulated physical maximum (4,200) MUST be rejected or flagged, since no sequence of taps can reach it. | M | T |
 
 ### M9 — Demo control & observability
 
@@ -591,7 +597,7 @@ The system is done when all of these hold. Anything unmet is stated plainly rath
 | AC-4 | A V2G session pays the vehicle using the same path with the sign flipped. | D |
 | AC-5 | At least ten concurrent sessions settle live, with both directions running. | D |
 | AC-6 | The wall shows the feed, the counters, the node view, and the split. | D |
-| AC-7 | A settlement without a signed reading is refused. | D — via FR-OPS-7, not an automated harness; see note below |
+| AC-7 | A settlement without a signed reading is refused. | D — the operator submits one deliberately malformed reading on demand (FR-OPS-7) and the system visibly rejects it. Deliberately not `T`: no adversarial test harness is realistically buildable today, and claiming one would be a verification method nobody can run |
 | AC-8 | The demo survives forced RPC degradation. | D |
 | AC-9 | The contracts are deployed and verifiable on Monad testnet; the repository is public. | I |
 | AC-10 | A recorded fallback exists. | I |
@@ -603,7 +609,11 @@ The system is done when all of these hold. Anything unmet is stated plainly rath
 
 Not everything above ships today. This is the honest cut.
 
-**Must exist by freeze** — AC-1, AC-2, AC-3, AC-4, AC-5, AC-6, AC-9, AC-10, and every `M` requirement in M1, M2, M4, M6, M7.
+**Must exist by freeze** — AC-1, AC-2, AC-3, AC-4, AC-5, AC-6, AC-9, AC-10, and every `M` requirement in M1, M2, **M5**, M4, M6, M7.
+
+**M5 was missing from this list until 2026-08-08 and its absence was a serious defect.** The earlier slice named M1, M2, M4, M6 and M7 only, which was correct while batching was the primary architecture and a trivial submitter would do. Under the per-tick decision (§13.3) the relay carries seven `M` requirements including the wallet pool (FR-REL-8), and without them AC-2 and AC-5 — the project's central claim — do not ship.
+
+**FR-REL-9's measurement is the first task of the build, before contracts.** It is cheap, it takes minutes, and its result decides whether the per-tick path survives at all. Every other fork in §13.3 hangs off that number, so measuring it late means discovering the answer after the code that depends on it exists.
 
 **Should follow if time allows** — M5 batching beyond the simplest form, M8 relay integration, FR-OPS-2, FR-DASH-9.
 
@@ -620,7 +630,7 @@ Not everything above ships today. This is the honest cut.
 | RSK-1 | Public RPC rate-limits under demo load | Wall freezes mid-pitch — the worst identified failure | Batching (FR-REL-2), degraded mode (FR-REL-4), rehearse at a conservative N | Relay |
 | RSK-2 | Architecture changes late because Q2 was decided under pressure | Rework at the worst hour | Decide batching before any contract code is written | Lead |
 | RSK-3 | Venue wifi collapses | Audience cannot join | FR-OPS-4: the beat runs with zero phones | Operator |
-| RSK-4 | Faucet cannot fund enough wallets | Concurrency drops | Relay-owned hot wallet, so N wallets are not needed | Relay |
+| RSK-4 | Faucet cannot fund the relay's wallet pool and the pre-registered identity pool | Concurrency drops, or per-tick becomes impossible | Size the pool to the rehearsed bar of ten rather than the stretch fifty; fund it early, before the faucet is under load from every other team. Mitigation rewritten 2026-08-08 — the previous one ("relay-owned hot wallet, so N wallets are not needed") was written when batching was primary and is false under FR-REL-8 | Relay |
 | RSK-5 | Reviewer reads the project as "Superfluid plus an EV skin" | Novelty score suffers | Lead with why 1 Hz settlement is economic only at this cost profile; do not claim the primitive is new | Pitch |
 | RSK-6 | Simulated metering read as overclaiming | Credibility loss with a technical audience | FR-MET-5 labelling, stated aloud in the pitch | Pitch |
 | RSK-7 | Time lost to a module with no stage presence | Core unfinished | §11 build order | Lead |
@@ -634,7 +644,7 @@ Blocking items live in `docs/idea/open_questions.md` and are not duplicated here
 | Open question | Requirements waiting on it |
 |---|---|
 | Q1 · Dedicated RPC endpoint? | FR-REL-2, FR-REL-4, NFR-P-2 |
-| Q2 · Per-tick calls or batched aggregation as primary? | FR-SET-6, FR-SET-9, FR-REL-1..3 — this decides contract signatures and the dashboard's event schema, so it must be settled before contract code is written |
+| ~~Q2 · Per-tick calls or batched aggregation as primary?~~ | **RESOLVED 2026-08-08: per-tick, one transaction per session per tick.** Batching demoted to fallback. See FR-REL-1, FR-REL-2, and §13.3. |
 | ~~Q3 · Target concurrency N?~~ | **RESOLVED 2026-08-08: rehearse at 10, attempt 50.** Recorded in NFR-P-2 and AC-5. `open_questions.md` still reads "Unresolved" and is now stale on this point. |
 
 ### 13.1 Decisions recorded against this baseline
@@ -645,6 +655,11 @@ Blocking items live in `docs/idea/open_questions.md` and are not duplicated here
 | Booth app build position | Last, after the core modules | §11 build order |
 | Driver-facing screen | None. A6 stays screenless | §2.3, no UI requirement |
 | Honesty constraints strength | All three remain MUST | FR-BOOTH-6, FR-BOOTH-8, FR-MET-5 |
+| Primary settlement architecture | One transaction per session per tick. Batching is the fallback. Resolves Q2 | FR-REL-1, FR-REL-2, §13.3 |
+| Booth player reward | 20% of any cash prize won, top 10, conditional on the team placing. Unconditional pot declined | Booth spec §7, table A |
+| FR-BOOTH-8 scope | Amended: soliciting votes stays banned; stating the payout's dependency on placement is now required | FR-BOOTH-8, FR-BOOTH-7 |
+| Contest reveal | Public screen live all day, sealed 10 s before close, winners revealed later in Discord | FR-BOOTH-10..12, booth spec §3.8 |
+| Booth cheat defence | Plausibility ceiling of 4,200 plus review before announcing. Server-side recompute stays P1 | FR-BOOTH-13, booth spec §6 |
 
 Two further items originate in this document:
 
@@ -666,6 +681,20 @@ Two further items originate in this document:
 | IF-4 left ambiguous whether the relay or the contract computes MON from energy — if the relay computes it, FR-SET-3 is asserted, not enforced | Contract does `whDelta × price` on-chain from a relay-submitted energy delta, never a relay-submitted MON amount | IF-4 |
 | FR-REL-3 (nonce management) implied general concurrent-tx handling that contradicts FR-REL-2's single-batch-per-interval model | Scoped down to serialised-pipeline nonce handling only | FR-REL-3 |
 | No pre-registration step specified for M6's simulated identities; registering ~50 identities live during spin-up would burn RPC headroom right before the demo needs it | Pool of identities registered during deployment, before code freeze; spin-up draws from the pool | UC-11, FR-SIM-6 |
+
+### 13.3 Consequences of the per-tick decision
+
+One transaction per session per tick was chosen over bundling for the stronger claim: separate transactions, no aggregation, nothing hidden. Three things follow, and none are optional.
+
+**A pool of wallets, not one.** A single account's transactions are processed in nonce order, so one wallet cannot issue many per second in parallel — they queue behind each other. The relay needs several funded wallets submitting concurrently (FR-REL-8). This makes ASM-1 harder than it looked: the faucet must fund a pool, and its own limits are unverified.
+
+**The RPC limit must be measured, not assumed.** No published figure exists for the public testnet endpoint. Send transactions at a rising rate and find where it starts refusing (FR-REL-9). That turns the project's largest unknown into a number, in minutes.
+
+**Load scales with concurrency, so the rehearsed number carries the demo.** At the acceptance bar of ten sessions this is ten transactions a second, a far smaller bet than fifty. The fifty-session attempt is a stretch target, not a pass condition (AC-5). If the measurement comes back below what the stretch needs, run the stretch from a recording.
+
+**Open tension with §13.2.** The adversarial review scoped FR-REL-3 down to serialised-pipeline nonce handling and said to build nothing more. That reasoning assumed batching was primary. The per-tick decision reinstates the parallel-nonce work it ruled out. FR-REL-3 now covers both modes explicitly, but the two conclusions were reached from different premises and the reviewer has not seen the newer decision.
+
+**Reversal trigger.** If measured capacity cannot sustain ten sessions with headroom, switch to FR-REL-2 batching — and FR-REL-3 collapses back to the simpler serialised form. Make that call on the measurement, early, not on stage.
 
 ---
 

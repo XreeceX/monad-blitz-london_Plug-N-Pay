@@ -50,7 +50,7 @@ event's first-listed criterion.
 | **Reverse Turk** (champion to beat) | 16 | 10 | 10 | 8 | 6 | 6 | 5 | **61** |
 | Athena-lite | 12 | 6 | 1 | 3 | 6 | 6 | 8 | **42** |
 | SimCityL1 | 8 | 8 | 2 | 9 | 3 | 5 | 4 | **39** |
-| Amber Current (EV streaming) | 8 | 6 | 1 | 5 | 5 | 3 | 9 | **37** |
+| Plug-N-Pay, formerly Amber Current (EV streaming) | 8 | 6 | 1 | 5 | 5 | 3 | 9 | **37** |
 
 **Drift check, every round:** re-score Reverse Turk cold against this rubric. It must
 return **61 ± 2**. If it does not, the rubric has drifted and that round is void — the
