@@ -1,4 +1,4 @@
-# Amber Current — Booth App Frontend Spec
+# Plug-N-Pay — Booth App Frontend Spec
 
 | | |
 |---|---|
@@ -14,7 +14,7 @@
 
 A phone web app reached by scanning a QR code. Its job is to hold sixty people's attention at a booth and, during the pitch, to turn the audience into live load on the projector behind the presenter.
 
-It is **not** the product. Amber Current is a settlement rail with no consumer app (`docs/idea/idea.md` §11). This toy borrows the product's physics — metered energy, per-second settlement, the vehicle-to-grid sign flip — and makes them playable. Nothing here ships as the real thing.
+It is **not** the product. Plug-N-Pay is a settlement rail with no consumer app (`docs/idea/idea.md` §11). This toy borrows the product's physics — metered energy, per-second settlement, the vehicle-to-grid sign flip — and makes them playable. Nothing here ships as the real thing.
 
 Two reasons it earns its build time on a day this short:
 
@@ -592,7 +592,7 @@ One keypress hits `POST /api/surge` with a timestamp about two seconds in the fu
 
 **Wall:** one horizontal amber conduit spans the projector with a marked breaker threshold, `DC FAST · 1.0 MW`. Per-player nodes flare as taps arrive. When the room total crosses the threshold, the breaker slams: full-screen flash, conduit goes white-hot, the room-total counter rolls up and freezes.
 
-> **Presenter, over the freeze:** "That number is sixty payment streams settling per second on Monad. That's machine-speed money. That's Amber Current."
+> **Presenter, over the freeze:** "That number is sixty payment streams settling per second on Monad. That's machine-speed money. That's Plug-N-Pay."
 
 Then each phone shows that player's personal slice of the total.
 

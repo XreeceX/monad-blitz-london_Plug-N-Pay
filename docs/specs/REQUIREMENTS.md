@@ -1,10 +1,10 @@
-# Amber Current — Software Requirements Specification
+# Plug-N-Pay — Software Requirements Specification
 
 **The main requirements document.** Everything else in `docs/specs/` is subordinate to this file.
 
 | | |
 |---|---|
-| **System** | Amber Current — per-second machine-to-machine settlement for EV charging on Monad |
+| **System** | Plug-N-Pay — per-second machine-to-machine settlement for EV charging on Monad |
 | **Version** | 1.0 |
 | **Date** | 2026-08-08 |
 | **Source of truth for intent** | `docs/idea/idea.md`, `docs/idea/story.md` |
@@ -16,11 +16,11 @@
 
 ### 1.1 Purpose
 
-This document states what Amber Current must do, for whom, and how each requirement will be shown to have been met. It is written for three audiences: the people building it today, a peer reviewing the submission, and anyone picking the project up afterwards.
+This document states what Plug-N-Pay must do, for whom, and how each requirement will be shown to have been met. It is written for three audiences: the people building it today, a peer reviewing the submission, and anyone picking the project up afterwards.
 
 ### 1.2 Product scope
 
-Amber Current is a **settlement rail**. A vehicle and a charging station authenticate each other automatically on physical connection, open a payment relationship between their on-chain wallets, and move value continuously in step with metered energy — in either direction — for exactly as long as current flows. When the current stops, the obligation stops. There is no invoice step, because the last settled on-chain state already is the bill.
+Plug-N-Pay is a **settlement rail**. A vehicle and a charging station authenticate each other automatically on physical connection, open a payment relationship between their on-chain wallets, and move value continuously in step with metered energy — in either direction — for exactly as long as current flows. When the current stops, the obligation stops. There is no invoice step, because the last settled on-chain state already is the bill.
 
 The system exists to close a gap named in `idea.md` §2: the physical reality of charging is continuous, and until a ledger was fast and cheap enough to settle per second, the financial reality could not match it.
 
@@ -70,7 +70,7 @@ Priority uses MoSCoW against the 18:00 code freeze: **M** must exist to demo, **
 
 ### 2.1 Product perspective
 
-Amber Current sits between two existing standards and a chain, and invents neither end:
+Plug-N-Pay sits between two existing standards and a chain, and invents neither end:
 
 ```
    ISO 15118 Plug & Charge          OCMF signed metering
@@ -79,7 +79,7 @@ Amber Current sits between two existing standards and a chain, and invents neith
               └──────────────┬───────────────┘
                              ▼
                    ┌───────────────────┐
-                   │  AMBER CURRENT    │   ← the contribution
+                   │    PLUG-N-PAY     │   ← the contribution
                    │  settlement rail  │
                    └───────────────────┘
                              ▼
@@ -146,10 +146,10 @@ The system's primary actors are machines. This is a defining property, not an ac
 
 | ID | Assumption | If wrong |
 |---|---|---|
-| **ASM-1** | Testnet faucet supplies enough MON to fund all demo wallets. | Reduce concurrency; fund one relay wallet only |
+| **ASM-1** | Testnet faucet supplies enough MON to fund the relay's **wallet pool** (FR-REL-8) plus the pre-registered identity pool (FR-SIM-6). Per-tick settlement made this a harder dependency than the original single-wallet assumption, and the faucet's own per-request limits are unverified. | Reduce concurrency. Falling back to a single relay wallet means falling back to batching (FR-REL-2), because one account cannot issue per-tick load in parallel — the two are the same decision |
 | **ASM-2** | Simulated metering is acceptable to reviewers when labelled honestly. | Nothing changes; labelling is already required by FR-MET-5 |
 | **ASM-3** | Venue wifi is usable but unreliable. | §12 fallback ladder governs |
-| **ASM-4** | Public RPC sustains at least a few transactions per second. | Batched settlement (M5) becomes mandatory rather than preferred |
+| **ASM-4** | Public RPC sustains at least the rehearsed concurrency in transactions per second — 10/s at AC-5's bar, ~50/s for the stretch attempt. This is an assumption only until FR-REL-9 measures it. | Batching (FR-REL-2) stops being the fallback and becomes mandatory, and FR-REL-3 collapses to its serialised form |
 | **ASM-5** | Reviewers accept a simplified handshake as "modelled on" ISO 15118. | Weaken the claim in the pitch, not the code |
 | **ASM-6** | Signature verification against the metering key happens off-chain, in the relay (M5), not per-signature in the M4 contract — on-chain verification of every tick from every concurrent session would exceed gas/RPC budget. The relay is therefore a **named trust boundary**: the contract trusts the relay's attestation that it checked each signature, it does not re-check them itself. | If this trust boundary is unacceptable to a reviewer, the fallback is to state it as the explicit production gap it is (e.g. a ZK-proof of the signature batch submitted on-chain) rather than attempt on-chain verification today. See NFR-M-4. |
 
@@ -597,7 +597,7 @@ The system is done when all of these hold. Anything unmet is stated plainly rath
 | AC-4 | A V2G session pays the vehicle using the same path with the sign flipped. | D |
 | AC-5 | At least ten concurrent sessions settle live, with both directions running. | D |
 | AC-6 | The wall shows the feed, the counters, the node view, and the split. | D |
-| AC-7 | A settlement without a signed reading is refused. | D — via FR-OPS-7, not an automated harness; see note below |
+| AC-7 | A settlement without a signed reading is refused. | D — the operator submits one deliberately malformed reading on demand (FR-OPS-7) and the system visibly rejects it. Deliberately not `T`: no adversarial test harness is realistically buildable today, and claiming one would be a verification method nobody can run |
 | AC-8 | The demo survives forced RPC degradation. | D |
 | AC-9 | The contracts are deployed and verifiable on Monad testnet; the repository is public. | I |
 | AC-10 | A recorded fallback exists. | I |
@@ -609,7 +609,11 @@ The system is done when all of these hold. Anything unmet is stated plainly rath
 
 Not everything above ships today. This is the honest cut.
 
-**Must exist by freeze** — AC-1, AC-2, AC-3, AC-4, AC-5, AC-6, AC-9, AC-10, and every `M` requirement in M1, M2, M4, M6, M7.
+**Must exist by freeze** — AC-1, AC-2, AC-3, AC-4, AC-5, AC-6, AC-9, AC-10, and every `M` requirement in M1, M2, **M5**, M4, M6, M7.
+
+**M5 was missing from this list until 2026-08-08 and its absence was a serious defect.** The earlier slice named M1, M2, M4, M6 and M7 only, which was correct while batching was the primary architecture and a trivial submitter would do. Under the per-tick decision (§13.3) the relay carries seven `M` requirements including the wallet pool (FR-REL-8), and without them AC-2 and AC-5 — the project's central claim — do not ship.
+
+**FR-REL-9's measurement is the first task of the build, before contracts.** It is cheap, it takes minutes, and its result decides whether the per-tick path survives at all. Every other fork in §13.3 hangs off that number, so measuring it late means discovering the answer after the code that depends on it exists.
 
 **Should follow if time allows** — M5 batching beyond the simplest form, M8 relay integration, FR-OPS-2, FR-DASH-9.
 
@@ -626,7 +630,7 @@ Not everything above ships today. This is the honest cut.
 | RSK-1 | Public RPC rate-limits under demo load | Wall freezes mid-pitch — the worst identified failure | Batching (FR-REL-2), degraded mode (FR-REL-4), rehearse at a conservative N | Relay |
 | RSK-2 | Architecture changes late because Q2 was decided under pressure | Rework at the worst hour | Decide batching before any contract code is written | Lead |
 | RSK-3 | Venue wifi collapses | Audience cannot join | FR-OPS-4: the beat runs with zero phones | Operator |
-| RSK-4 | Faucet cannot fund enough wallets | Concurrency drops | Relay-owned hot wallet, so N wallets are not needed | Relay |
+| RSK-4 | Faucet cannot fund the relay's wallet pool and the pre-registered identity pool | Concurrency drops, or per-tick becomes impossible | Size the pool to the rehearsed bar of ten rather than the stretch fifty; fund it early, before the faucet is under load from every other team. Mitigation rewritten 2026-08-08 — the previous one ("relay-owned hot wallet, so N wallets are not needed") was written when batching was primary and is false under FR-REL-8 | Relay |
 | RSK-5 | Reviewer reads the project as "Superfluid plus an EV skin" | Novelty score suffers | Lead with why 1 Hz settlement is economic only at this cost profile; do not claim the primitive is new | Pitch |
 | RSK-6 | Simulated metering read as overclaiming | Credibility loss with a technical audience | FR-MET-5 labelling, stated aloud in the pitch | Pitch |
 | RSK-7 | Time lost to a module with no stage presence | Core unfinished | §11 build order | Lead |

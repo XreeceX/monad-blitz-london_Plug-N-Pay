@@ -83,9 +83,13 @@ Since there's no consumer app to demo, the dashboard *is* the demo. It should re
 
 The demo should not be "one car, one station, watch a number move" — it should spin up **many simulated sessions concurrently** (e.g. 10–50 car↔station sessions running at once, a mix of charging and V2G-discharging) so the dashboard shows real throughput: a busy, continuously-updating feed and map, not an isolated transaction. This is also the strongest, most direct visual proof of the "only possible at Monad's speed/cost" claim — a slower or more expensive chain couldn't sustain this many concurrent per-second settlements live on stage. This point should directly inform Section 9's hackathon scope decisions (the simulator layer needs to support spinning up N concurrent simulated car/station pairs, not just one hardcoded pair).
 
-## 11c. Naming: Amber Current
+## 11c. Naming: Plug-N-Pay
 
-**Decision: Amber Current.** Chosen over Voltstream (existing unrelated companies already use the name — real collision risk) and Open Circuit (more evocative, but a generic electrical-engineering term, weaker trademark defensibility) — Amber Current had no meaningful collisions found and keeps the option open to carry the name past the hackathon if this becomes a real project.
+**Current name: Plug-N-Pay**, adopted 2026-08-08 and matching the repository and README. Every specification uses it.
+
+**Superseded decision, kept as the record.** An earlier pass chose **Amber Current**, over Voltstream (existing unrelated companies already use the name, so a real collision risk) and Open Circuit (more evocative, but a generic electrical-engineering term with weaker trademark defensibility). Amber Current had no meaningful collisions and was picked partly to keep the option of carrying the name past the hackathon.
+
+That reasoning still stands on its own terms; it was simply overtaken. Plug-N-Pay says what the product does in three words, which is worth more in a three-minute pitch than trademark headroom on a project that may not outlive the day. If this does become a real thing, the collision check that favoured Amber Current is worth re-running against Plug-N-Pay, which has not been checked.
 
 ## 11d. Demo opening: dashboard-led, no physical prop
 
